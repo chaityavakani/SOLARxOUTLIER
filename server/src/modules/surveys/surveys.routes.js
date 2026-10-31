@@ -69,7 +69,7 @@ surveysRouter.put(
       structureHeightFt: z.coerce.number().min(0).optional(),
       earthingPointAvailable: z.string().optional().transform((v) => v === 'true' || v === 'yes'),
       recommendedCapacityKw: z.coerce.number().positive('Enter recommended capacity.'),
-      recommendedSystemType: z.enum(['ON_GRID', 'OFF_GRID']),
+      recommendedSystemType: z.enum(['ON_GRID', 'OFF_GRID', 'NOT_SURE']),
       notes: z.string().optional(),
     }),
   }),

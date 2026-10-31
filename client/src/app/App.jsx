@@ -5,6 +5,7 @@ import Sidebar from '../components/Sidebar.jsx';
 import Header from '../components/Header.jsx';
 
 // Individual Modular Page Components
+import SignupPage from '../pages/SignupPage.jsx';
 import DirectorDashboardPage from '../pages/DirectorDashboardPage.jsx';
 import LeadsPage from '../pages/LeadsPage.jsx';
 import SurveysPage from '../pages/SurveysPage.jsx';
@@ -165,6 +166,20 @@ function App() {
           setView('app');
         }}
         onBack={() => setView('public')}
+        onSignup={() => setView('signup')}
+      />
+    );
+  }
+
+  if (view === 'signup') {
+    return (
+      <SignupPage
+        onSuccess={(nextUser) => {
+          setUser(nextUser);
+          setView('app');
+        }}
+        onBack={() => setView('public')}
+        onLogin={() => setView('login')}
       />
     );
   }
@@ -184,7 +199,7 @@ function App() {
     );
   }
 
-  return <PublicPage onLogin={() => setView('login')} />;
+  return <PublicPage onLogin={() => setView('login')} onSignup={() => setView('signup')} />;
 }
 
 export default App;

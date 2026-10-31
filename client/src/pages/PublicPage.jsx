@@ -3,7 +3,7 @@ import { ArrowRight, CheckCircle2, ChevronDown, LogIn } from 'lucide-react';
 import { api, errorText } from '../shared/api.js';
 import { money } from '../shared/formatters.js';
 
-export default function PublicPage({ onLogin }) {
+export default function PublicPage({ onLogin, onSignup }) {
   const [packages, setPackages] = useState([]);
   const [stats, setStats] = useState(null);
   const [form, setForm] = useState({
@@ -90,9 +90,9 @@ export default function PublicPage({ onLogin }) {
               Reliable rooftop solar, carefully designed, professionally installed, and supported for the long run.
             </p>
             <div className="hero-actions">
-              <a className="button primary" href="#enquire">
+              <button className="button primary" onClick={onSignup}>
                 Get a free site survey <ArrowRight size={17} />
-              </a>
+              </button>
               <a className="button light" href="#packages">
                 View packages
               </a>
@@ -182,7 +182,8 @@ export default function PublicPage({ onLogin }) {
               <p className="eyebrow">START HERE</p>
               <h2>Let's look at your roof.</h2>
               <p>
-                Share a few details. A solar advisor will call you within one working day to arrange your free survey.
+                Create a free account to request your site survey, track your project, and access your quotes and
+                warranty documents — all in one place.
               </p>
               <ul>
                 <li><CheckCircle2 size={18} /> No obligation, practical advice</li>
@@ -190,70 +191,21 @@ export default function PublicPage({ onLogin }) {
                 <li><CheckCircle2 size={18} /> One team from survey to service</li>
               </ul>
             </div>
-            <form className="form-card" onSubmit={submit}>
-              <h3>Request a free site survey</h3>
-              <label>
-                Full name
-                <input required value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} />
-              </label>
-              <div className="form-row">
-                <label>
-                  Phone
-                  <input
-                    required
-                    pattern="[0-9]{10}"
-                    placeholder="10-digit mobile"
-                    value={form.phone}
-                    onChange={(event) =>
-                      setForm({ ...form, phone: event.target.value.replace(/\D/g, '').slice(0, 10) })
-                    }
-                  />
-                </label>
-                <label>
-                  City
-                  <input required value={form.city} onChange={(event) => setForm({ ...form, city: event.target.value })} />
-                </label>
-              </div>
-              <div className="form-row">
-                <label>
-                  System type
-                  <select
-                    value={form.systemType}
-                    onChange={(event) => setForm({ ...form, systemType: event.target.value })}
-                  >
-                    <option value="NOT_SURE">Not sure</option>
-                    <option value="ON_GRID">On-grid</option>
-                    <option value="OFF_GRID">Off-grid</option>
-                  </select>
-                </label>
-                <label>
-                  Capacity
-                  <select
-                    value={form.capacityKw}
-                    onChange={(event) => setForm({ ...form, capacityKw: event.target.value })}
-                  >
-                    <option value="">Not sure</option>
-                    {[1, 2, 3, 4, 5].map((value) => (
-                      <option key={value} value={value}>
-                        {value} kW
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              </div>
-              <label className="check">
-                <input
-                  type="checkbox"
-                  checked={form.wantsSubsidy}
-                  onChange={(event) => setForm({ ...form, wantsSubsidy: event.target.checked })}
-                />
-                I would like guidance on subsidy paperwork
-              </label>
-              <button className="button primary full" type="submit">
-                Request my survey <ArrowRight size={17} />
+            <div className="form-card enquiry-cta-card">
+              <h3>Ready to go solar?</h3>
+              <p>
+                Sign up in under 2 minutes. Tell us about your home and electricity usage — our advisor will call you
+                within one working day.
+              </p>
+              <button className="button primary full" onClick={onSignup}>
+                Create a free account <ArrowRight size={17} />
+              </button>
+              <p className="cta-divider">Already have an account?</p>
+              <button className="button outline full" onClick={onLogin}>
+                Sign in to your portal
               </button>
               {message && <p className="form-message">{message}</p>}
-            </form>
+            </div>
           </section>
         </div>
       </main>

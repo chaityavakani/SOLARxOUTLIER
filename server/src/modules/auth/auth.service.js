@@ -4,6 +4,7 @@ import { prisma } from '../../core/prisma.js';
 import { env, isProd } from '../../config/env.js';
 import { publicUser } from '../../middlewares/requireAuth.js';
 import { AppError, conflict, unauthorized } from '../../core/AppError.js';
+import { createLead } from '../leads/leads.service.js';
 
 export const COOKIE_MAX_AGE = 8 * 60 * 60 * 1000;
 
@@ -62,7 +63,7 @@ export async function registerCustomer({ name, phone, email, password, addressLi
   }
   const passwordHash = await bcrypt.hash(password, 10);
 
-  return prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async (tx) => {
     let customer = await tx.customer.findFirst({ where: { phone } });
     if (customer?.userId) {
       throw conflict('This phone number is already linked to a customer account. Please sign in.', 'PHONE_TAKEN');
@@ -80,6 +81,28 @@ export async function registerCustomer({ name, phone, email, password, addressLi
     const full = await tx.user.findUnique({ where: { id: user.id }, include: { customer: true } });
     return publicUser(full);
   });
+
+  // Auto-create an enquiry lead so the Sales Executive sees this signup immediately
+  try {
+    await createLead(
+      {
+        name,
+        phone,
+        email: email || undefined,
+        city,
+        address: addressLine,
+        source: 'WEB_FORM',
+        requestedSystemType: 'NOT_SURE',
+        wantsSubsidy: false,
+      },
+      null,
+      null,
+    );
+  } catch (_) {
+    // lead creation is best-effort — don't fail the signup if it errors
+  }
+
+  return result;
 }
 
 /**
