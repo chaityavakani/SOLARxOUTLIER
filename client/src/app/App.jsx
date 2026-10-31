@@ -62,6 +62,11 @@ function AppShell({ user, onLogout }) {
 
   const title = sectionTitles[section] || 'Workspace';
 
+  useEffect(() => {
+    document.title = `${title} · SunPower SIMS`;
+    window.scrollTo(0, 0);
+  }, [title]);
+
   return (
     <div className="app-shell">
       {/* Sidebar for Desktop & Mobile Drawer */}

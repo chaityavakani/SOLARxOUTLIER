@@ -9,8 +9,8 @@ export default function Header({ user, title, onToggleMobileNav, extraActions })
           <Menu size={22} />
         </button>
         <div className="mobile-brand-title">
-          <Sun size={18} className="text-amber-500" />
-          <strong>{title}</strong>
+          <Sun size={18} />
+          <strong>SunPower</strong>
         </div>
         <span className="avatar sm">{user?.name ? user.name[0].toUpperCase() : 'U'}</span>
       </div>

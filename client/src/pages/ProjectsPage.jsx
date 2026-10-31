@@ -272,7 +272,7 @@ export default function ProjectsPage({ onNavigate }) {
                       <StatusBadge status={p.status} size="small" />
                     </td>
                     <td>
-                      <button className="button outline small-button">Manage Project</button>
+                      <button className="button outline small-button">Open</button>
                     </td>
                   </tr>
                 ))}

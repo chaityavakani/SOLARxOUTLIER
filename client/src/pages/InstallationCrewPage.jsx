@@ -168,7 +168,7 @@ export default function InstallationCrewPage({ user, onNavigate }) {
                   <StatusBadge status={job.status} size="small" />
                 </div>
 
-                <div className="job-specs-chip p-2.5 bg-slate-50 rounded text-xs flex justify-between font-semibold mb-3">
+                <div className="job-specs-chip p-2.5 bg-slate-50 rounded text-xs flex justify-between flex-wrap gap-2 font-semibold mb-3">
                   <span>System: {Number(job.project?.capacityKw)} kW · {job.project?.systemType.replace('_', '-')}</span>
                   <span>Scheduled: {job.scheduledDate ? new Date(job.scheduledDate).toLocaleDateString('en-IN') : 'As Ready'}</span>
                 </div>

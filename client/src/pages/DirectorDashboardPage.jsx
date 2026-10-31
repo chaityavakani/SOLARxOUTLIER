@@ -249,18 +249,18 @@ export default function DirectorDashboardPage({ onNavigate }) {
           <p className="muted p-4">No installation jobs in this category.</p>
         ) : (
           <div className="table-wrap">
-            <table className="data-table">
+            <table className="data-table director-profit-table">
               <thead>
                 <tr>
                   <th>Job Code</th>
                   <th>Customer</th>
                   <th>System</th>
-                  <th>Quoted Revenue</th>
-                  <th>Stock / Hardware Cost</th>
-                  <th>Crew Labour Cost</th>
+                  <th>Revenue</th>
+                  <th>Hardware</th>
+                  <th>Labour</th>
                   <th>Expenses</th>
                   <th>Net Profit</th>
-                  <th>Margin %</th>
+                  <th>Margin</th>
                   <th>Result</th>
                 </tr>
               </thead>
@@ -395,14 +395,14 @@ export default function DirectorDashboardPage({ onNavigate }) {
           <table className="data-table">
             <thead>
               <tr>
-                <th>Technician Name</th>
+                <th>Technician</th>
                 <th>Role</th>
                 <th>Phone</th>
-                <th>Installations Completed</th>
-                <th>Surveys Performed</th>
-                <th>Total Hours</th>
-                <th>Hourly Rate</th>
-                <th>Estimated Payroll</th>
+                <th>Jobs Done</th>
+                <th>Surveys</th>
+                <th>Hours</th>
+                <th>Rate/hr</th>
+                <th>Est. Payroll</th>
               </tr>
             </thead>
             <tbody>
