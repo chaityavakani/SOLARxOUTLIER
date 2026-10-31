@@ -1,5 +1,5 @@
 import React from 'react';
-import { Menu, Sun, Shield } from 'lucide-react';
+import { Menu, Shield } from 'lucide-react';
 
 export default function Header({ user, title, onToggleMobileNav, extraActions }) {
   return (
@@ -9,8 +9,7 @@ export default function Header({ user, title, onToggleMobileNav, extraActions })
           <Menu size={22} />
         </button>
         <div className="mobile-brand-title">
-          <Sun size={18} />
-          <strong>SunPower</strong>
+          <img src="/logo.png" alt="Logo" className="site-logo-mobile" />
         </div>
         <span className="avatar sm">{user?.name ? user.name[0].toUpperCase() : 'U'}</span>
       </div>
@@ -18,7 +17,7 @@ export default function Header({ user, title, onToggleMobileNav, extraActions })
       <header className="app-header">
         <div>
           <p className="eyebrow">
-            SUNPOWER SOLUTIONS / {user?.role ? user.role.replaceAll('_', ' ') : 'WORKSPACE'}
+            WORKSPACE / {user?.role ? user.role.replaceAll('_', ' ') : 'USER'}
           </p>
           <h1>{title}</h1>
         </div>
@@ -38,4 +37,3 @@ export default function Header({ user, title, onToggleMobileNav, extraActions })
     </>
   );
 }
-

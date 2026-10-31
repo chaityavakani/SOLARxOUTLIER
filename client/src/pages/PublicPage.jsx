@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { ArrowRight, CheckCircle2, ChevronDown, LogIn, Sun } from 'lucide-react';
+import { ArrowRight, CheckCircle2, ChevronDown, LogIn } from 'lucide-react';
 import { api, errorText } from '../shared/api.js';
 import { money } from '../shared/formatters.js';
 
@@ -56,9 +56,8 @@ export default function PublicPage({ onLogin }) {
   return (
     <div className="public-page">
       <header className={`public-nav ${isPastHero ? 'public-nav-solid' : 'public-nav-transparent'}`}>
-        <a className="brand" href="#top">
-          <span className="brand-mark"><Sun size={18} /></span>
-          SunPower <em>Solutions</em>
+        <a className="brand-logo-link" href="#top" aria-label="Home">
+          <img src="/logo.png" alt="Logo" className="site-logo" />
         </a>
         <nav>
           <a href="#packages">Packages</a>
@@ -260,12 +259,11 @@ export default function PublicPage({ onLogin }) {
       </main>
 
       <footer>
-        <div className="brand">
-          <span className="brand-mark"><Sun size={18} /></span>
-          SunPower <em>Solutions</em>
+        <div className="brand-logo-link">
+          <img src="/logo.png" alt="Logo" className="site-logo footer-logo" />
         </div>
         <span>Practical solar for better homes.</span>
-        <span>© 2026 SunPower Solutions</span>
+        <span>© 2026</span>
       </footer>
     </div>
   );

@@ -10,7 +10,6 @@ import {
   ShieldCheck,
   LifeBuoy,
   LogOut,
-  Sun,
   Boxes,
 } from 'lucide-react';
 
@@ -76,14 +75,8 @@ export default function Sidebar({ user, currentSection, onNavigate, onLogout }) 
 
   return (
     <aside className="sidebar">
-      <div className="side-brand">
-        <span className="brand-mark">
-          <Sun size={18} />
-        </span>
-        <div>
-          <span>SunPower</span>
-          <small className="brand-sub">SIMS PLATFORM</small>
-        </div>
+      <div className="side-brand side-brand-logo-only">
+        <img src="/logo.png" alt="Logo" className="site-logo side-logo" />
       </div>
 
       <div className="workspace-label">
@@ -120,4 +113,3 @@ export default function Sidebar({ user, currentSection, onNavigate, onLogout }) 
     </aside>
   );
 }
-
