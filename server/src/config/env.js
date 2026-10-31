@@ -8,6 +8,11 @@ const schema = z.object({
   PORT: z.coerce.number().default(5000),
   UPLOAD_DIR: z.string().default('uploads'),
   NODE_ENV: z.string().default('development'),
+  SMTP_HOST: z.string().default('smtp.gmail.com'),
+  SMTP_PORT: z.coerce.number().default(465),
+  SMTP_USER: z.string().optional(),
+  SMTP_PASS: z.string().optional(),
+  SMTP_FROM: z.string().default('SOLARxOUTLIER <noreply@solarxoutlier.com>'),
 });
 
 export const env = schema.parse(process.env);

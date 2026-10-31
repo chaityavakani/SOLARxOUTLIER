@@ -12,6 +12,9 @@ import {
   login,
   registerCustomer,
   setAuthCookie,
+  requestOtp,
+  verifyOtp,
+  resetPasswordWithToken,
 } from './auth.service.js';
 
 export const authRouter = Router();
@@ -68,6 +71,56 @@ authRouter.post(
     const { token } = await login(req.body.phone, req.body.password);
     setAuthCookie(res, token);
     created(res, { user });
+  })
+);
+
+// Step 1 — request OTP (rate-limited; never reveals whether account exists)
+authRouter.post(
+  '/request-otp',
+  loginLimiter,
+  validate({
+    body: z.object({
+      identifier: z.string().trim().min(3, 'Enter your email or phone number.'),
+    }),
+  }),
+  asyncHandler(async (req, res) => {
+    await requestOtp(req.body.identifier);
+    ok(res, { sent: true });
+  })
+);
+
+// Step 2 — verify OTP; returns a short-lived reset JWT on success
+authRouter.post(
+  '/verify-otp',
+  loginLimiter,
+  validate({
+    body: z.object({
+      identifier: z.string().trim().min(3),
+      otp: z.string().trim().length(6, 'OTP must be 6 digits.').regex(/^\d{6}$/, 'OTP must be 6 digits.'),
+    }),
+  }),
+  asyncHandler(async (req, res) => {
+    const result = await verifyOtp(req.body.identifier, req.body.otp);
+    ok(res, result);
+  })
+);
+
+// Step 3 — set new password using the reset JWT from step 2
+authRouter.post(
+  '/reset-password',
+  validate({
+    body: z.object({
+      resetToken: z.string().min(10),
+      newPassword: z
+        .string()
+        .min(8, 'Password must be at least 8 characters.')
+        .regex(/[A-Za-z]/, 'Include at least one letter.')
+        .regex(/[0-9]/, 'Include at least one number.'),
+    }),
+  }),
+  asyncHandler(async (req, res) => {
+    const result = await resetPasswordWithToken(req.body.resetToken, req.body.newPassword);
+    ok(res, result);
   })
 );
 

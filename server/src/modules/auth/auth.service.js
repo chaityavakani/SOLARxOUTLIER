@@ -1,10 +1,12 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
 import { prisma } from '../../core/prisma.js';
 import { env, isProd } from '../../config/env.js';
 import { publicUser } from '../../middlewares/requireAuth.js';
-import { AppError, conflict, unauthorized } from '../../core/AppError.js';
+import { AppError, conflict, unauthorized, badRequest } from '../../core/AppError.js';
 import { createLead } from '../leads/leads.service.js';
+import { sendOtpEmail, sendWelcomeEmail } from '../../core/mailer.js';
 
 export const COOKIE_MAX_AGE = 8 * 60 * 60 * 1000;
 
@@ -117,6 +119,93 @@ export async function changePassword(userId, currentPassword, newPassword) {
   return { changed: true };
 }
 
+const OTP_EXPIRY_MS  = 10 * 60 * 1000; // 10 minutes
+const OTP_MAX_TRIES  = 5;
+
+/**
+ * Generates a 6-digit OTP, bcrypt-hashes it (invisible in DB),
+ * stores the hash + expiry, resets the attempt counter, then emails the OTP.
+ * Always returns success — never reveals whether the account exists.
+ */
+export async function requestOtp(identifier) {
+  const user = await prisma.user.findFirst({
+    where: { OR: [{ email: identifier }, { phone: identifier }] },
+  });
+  if (!user || !user.email) return; // silently no-op — prevents user enumeration
+
+  // Cryptographically secure 6-digit OTP
+  const otpPlain = String(crypto.randomInt(100000, 999999));
+  const otpHash  = await bcrypt.hash(otpPlain, 10);
+  const otpExpiry = new Date(Date.now() + OTP_EXPIRY_MS);
+
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { otpHash, otpExpiry, otpAttempts: 0 },
+  });
+
+  await sendOtpEmail(user.email, user.name, otpPlain);
+}
+
+/**
+ * Verifies the OTP. On success clears OTP fields and returns a short-lived
+ * signed reset-JWT so the client can set a new password in the next step.
+ * The OTP itself is never stored in plaintext anywhere.
+ */
+export async function verifyOtp(identifier, otpPlain) {
+  const user = await prisma.user.findFirst({
+    where: { OR: [{ email: identifier }, { phone: identifier }] },
+  });
+
+  // Generic error — don't leak whether account/OTP exists
+  const invalid = () => new AppError(400, 'INVALID_OTP', 'Incorrect OTP. Please try again.');
+
+  if (!user || !user.otpHash || !user.otpExpiry) throw invalid();
+  if (new Date() > user.otpExpiry) {
+    await prisma.user.update({ where: { id: user.id }, data: { otpHash: null, otpExpiry: null, otpAttempts: 0 } });
+    throw new AppError(400, 'OTP_EXPIRED', 'Your OTP has expired. Please request a new one.');
+  }
+  if (user.otpAttempts >= OTP_MAX_TRIES) {
+    await prisma.user.update({ where: { id: user.id }, data: { otpHash: null, otpExpiry: null, otpAttempts: 0 } });
+    throw new AppError(400, 'OTP_LOCKED', 'Too many wrong attempts. Please request a new OTP.');
+  }
+
+  const match = await bcrypt.compare(otpPlain, user.otpHash);
+  if (!match) {
+    await prisma.user.update({ where: { id: user.id }, data: { otpAttempts: { increment: 1 } } });
+    const remaining = OTP_MAX_TRIES - user.otpAttempts - 1;
+    throw new AppError(400, 'INVALID_OTP', `Incorrect OTP. ${remaining} attempt${remaining !== 1 ? 's' : ''} remaining.`);
+  }
+
+  // Clear OTP immediately — single-use
+  await prisma.user.update({ where: { id: user.id }, data: { otpHash: null, otpExpiry: null, otpAttempts: 0 } });
+
+  // Issue a 15-minute signed reset JWT — purpose-scoped, not a login token
+  const resetToken = jwt.sign(
+    { sub: user.id, purpose: 'password_reset' },
+    env.JWT_SECRET,
+    { expiresIn: '15m' }
+  );
+  return { resetToken };
+}
+
+/**
+ * Accepts the purpose-scoped reset JWT and sets a new password.
+ */
+export async function resetPasswordWithToken(resetToken, newPassword) {
+  let payload;
+  try {
+    payload = jwt.verify(resetToken, env.JWT_SECRET);
+  } catch {
+    throw new AppError(400, 'INVALID_TOKEN', 'Reset session expired. Please start again.');
+  }
+  if (payload.purpose !== 'password_reset') {
+    throw new AppError(400, 'INVALID_TOKEN', 'Invalid reset token.');
+  }
+  const passwordHash = await bcrypt.hash(newPassword, 10);
+  await prisma.user.update({ where: { id: payload.sub }, data: { passwordHash } });
+  return { reset: true };
+}
+
 /** Creates a working customer login when a quote is first sent. */
 export async function ensureCustomerLogin(customer) {
   if (customer.userId) return null;
@@ -137,5 +226,9 @@ export async function ensureCustomerLogin(customer) {
     },
   });
   await prisma.customer.update({ where: { id: customer.id }, data: { userId: user.id } });
+  // Send welcome email with temp password if customer has an email
+  if (customer.email) {
+    sendWelcomeEmail(customer.email, customer.name, tempPassword).catch(() => {});
+  }
   return tempPassword;
 }
