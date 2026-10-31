@@ -93,6 +93,7 @@ function AppShell({ user, onLogout }) {
           user={user}
           title={title}
           onToggleMobileNav={() => setMobileNavOpen(!mobileNavOpen)}
+          onLogout={onLogout}
         />
 
         <div className="page-content">

@@ -63,5 +63,6 @@ export function publicUser(user) {
     isActive: user.isActive,
     customerId: user.customer?.id || null,
     lastLoginAt: user.lastLoginAt,
+    createdAt: user.createdAt,
   };
 }
