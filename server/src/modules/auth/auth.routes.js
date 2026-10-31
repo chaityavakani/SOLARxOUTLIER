@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { asyncHandler } from '../../core/asyncHandler.js';
 import { ok, created } from '../../core/response.js';
 import { validate } from '../../middlewares/validate.js';
-import { requireAuth, publicUser } from '../../middlewares/requireAuth.js';
+import { requireAuth, publicUser, getSessionUser } from '../../middlewares/requireAuth.js';
 import { loginLimiter } from '../../middlewares/rateLimits.js';
 import { badRequest } from '../../core/AppError.js';
 import {
@@ -38,9 +38,13 @@ authRouter.post('/logout', (_req, res) => {
   ok(res, { signedOut: true });
 });
 
-authRouter.get('/me', requireAuth, (req, res) => {
-  ok(res, { user: publicUser(req.user) });
-});
+authRouter.get(
+  '/me',
+  asyncHandler(async (req, res) => {
+    const user = await getSessionUser(req);
+    ok(res, { user: user ? publicUser(user) : null });
+  })
+);
 
 authRouter.post(
   '/register',

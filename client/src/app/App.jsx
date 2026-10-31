@@ -134,8 +134,10 @@ function App() {
     api
       .get('/auth/me')
       .then(({ data }) => {
-        setUser(data.data.user);
-        setView('app');
+        if (data?.data?.user) {
+          setUser(data.data.user);
+          setView('app');
+        }
       })
       .catch(() => {});
 
