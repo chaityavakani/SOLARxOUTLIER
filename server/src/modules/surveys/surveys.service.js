@@ -3,6 +3,7 @@ import { badRequest, forbidden, notFound } from '../../core/AppError.js';
 import { notifyRole, notifyUsers } from '../../core/notify.js';
 import { emitEvent } from '../../core/events.js';
 import { saveAttachment } from '../../core/upload.js';
+import { getSetting } from '../../core/settings.js';
 
 const include = {
   lead: true,
@@ -170,6 +171,7 @@ export async function reviewSurvey(id, { approve, reason }, user) {
   if (survey.status !== 'SUBMITTED') {
     throw badRequest('Only a submitted survey can be reviewed.', 'INVALID_TRANSITION');
   }
+  const visitFee = approve ? Number(await getSetting('surveyVisitRate') || 500) : null;
   const updated = await prisma.$transaction(async (tx) => {
     const row = await tx.survey.update({
       where: { id },
@@ -178,6 +180,8 @@ export async function reviewSurvey(id, { approve, reason }, user) {
         reviewedById: user.id,
         reviewedAt: new Date(),
         rejectionReason: approve ? null : reason,
+        visitFee: visitFee !== null ? visitFee : undefined,
+        visitFeePaid: false,
       },
       include,
     });
@@ -200,7 +204,14 @@ export async function reviewSurvey(id, { approve, reason }, user) {
     body: `${survey.lead.name}${approve ? ' is ready for a quote.' : `: ${reason}`}`,
     link: `/sales/leads/${survey.leadId}`,
   });
-  if (approve) emitEvent('survey.approved', { surveyId: id, leadId: survey.leadId });
+  if (approve) {
+    emitEvent('survey.approved', { surveyId: id, leadId: survey.leadId });
+    await notifyUsers([survey.technicianId], {
+      title: 'Survey approved — visit fee credited',
+      body: `Visit fee of ₹${visitFee} for ${survey.lead.name} has been credited to your account.`,
+      link: `/field/surveys/${id}`,
+    });
+  }
   return updated;
 }
 
@@ -208,6 +219,67 @@ export async function rescheduleSurvey(id, scheduledAt) {
   return prisma.survey.update({
     where: { id },
     data: { scheduledAt: new Date(scheduledAt), status: 'SCHEDULED' },
+    include,
+  });
+}
+
+/** Returns all approved surveys for a technician with visit fee info. */
+export async function getTechnicianEarnings(technicianId, actor) {
+  if (actor.role === 'SURVEY_TECHNICIAN' && actor.id !== technicianId) {
+    throw forbidden('You can only view your own earnings.');
+  }
+  const surveys = await prisma.survey.findMany({
+    where: { technicianId, status: 'APPROVED', visitFee: { not: null } },
+    orderBy: { reviewedAt: 'desc' },
+    select: {
+      id: true,
+      scheduledAt: true,
+      reviewedAt: true,
+      visitFee: true,
+      visitFeePaid: true,
+      lead: { select: { name: true, city: true } },
+    },
+  });
+  const totalEarned = surveys.reduce((s, sv) => s + Number(sv.visitFee || 0), 0);
+  const totalPaid = surveys.filter((sv) => sv.visitFeePaid).reduce((s, sv) => s + Number(sv.visitFee || 0), 0);
+  const totalPending = totalEarned - totalPaid;
+  return { surveys, totalEarned, totalPaid, totalPending };
+}
+
+/** All unpaid visit fees — for SuperAdmin payout dashboard. */
+export async function listUnpaidVisitFees() {
+  const surveys = await prisma.survey.findMany({
+    where: { status: 'APPROVED', visitFee: { not: null }, visitFeePaid: false },
+    orderBy: { reviewedAt: 'asc' },
+    select: {
+      id: true,
+      scheduledAt: true,
+      reviewedAt: true,
+      visitFee: true,
+      technician: { select: { id: true, name: true, phone: true } },
+      lead: { select: { name: true, city: true } },
+    },
+  });
+  // Group by technician
+  const map = {};
+  for (const sv of surveys) {
+    const tid = sv.technician.id;
+    if (!map[tid]) map[tid] = { technician: sv.technician, surveys: [], total: 0 };
+    map[tid].surveys.push(sv);
+    map[tid].total += Number(sv.visitFee);
+  }
+  return Object.values(map);
+}
+
+/** SuperAdmin marks a survey's visit fee as paid out. */
+export async function markVisitFeePaid(id, actor) {
+  const survey = await prisma.survey.findUnique({ where: { id } });
+  if (!survey) throw notFound('Survey not found.');
+  if (survey.status !== 'APPROVED') throw badRequest('Only approved surveys have visit fees.', 'NOT_APPROVED');
+  if (survey.visitFeePaid) throw badRequest('This visit fee is already marked as paid.', 'ALREADY_PAID');
+  return prisma.survey.update({
+    where: { id },
+    data: { visitFeePaid: true },
     include,
   });
 }

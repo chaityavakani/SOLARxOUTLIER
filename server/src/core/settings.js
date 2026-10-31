@@ -12,6 +12,7 @@ export const DEFAULT_SETTINGS = {
   defaultTaxPercent: 13.8,
   labourRatePerHour: 350,
   serviceVisitCharge: 500,
+  surveyVisitRate: 500,
   quoteValidityDays: 15,
   surveySlaHours: 48,
   warrantyExpiryAlertDays: 30,

@@ -406,6 +406,8 @@ model Survey {
   reviewedById          String?
   reviewedAt            DateTime?
   rejectionReason       String?
+  visitFee              Decimal?        @db.Decimal(10, 2)
+  visitFeePaid          Boolean         @default(false)
   createdAt             DateTime        @default(now())
   updatedAt             DateTime        @updatedAt
 

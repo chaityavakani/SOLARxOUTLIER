@@ -12,6 +12,7 @@ import {
   LogOut,
   Boxes,
   UserCog,
+  Settings,
 } from 'lucide-react';
 
 export default function Sidebar({ user, currentSection, onNavigate, onLogout }) {
@@ -30,6 +31,7 @@ export default function Sidebar({ user, currentSection, onNavigate, onLogout }) 
           { key: 'warranties', label: 'Warranty Registry', icon: ShieldCheck },
           { key: 'tickets', label: 'Support & Repairs', icon: LifeBuoy },
           { key: 'team', label: 'Team & Pay Rates', icon: UserCog },
+          { key: 'settings', label: 'System Settings', icon: Settings },
         ];
       case 'DIRECTOR':
         return [

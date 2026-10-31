@@ -12,8 +12,11 @@ import {
   Calendar,
   Send,
   Zap,
+  IndianRupee,
+  Wallet,
 } from 'lucide-react';
 import { api, errorText } from '../shared/api.js';
+import { money } from '../shared/formatters.js';
 import StatusBadge from '../components/StatusBadge.jsx';
 import Modal from '../components/Modal.jsx';
 
@@ -27,6 +30,13 @@ export default function SurveysPage({ user, onNavigate }) {
   const [rejectReason, setRejectReason] = useState('');
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
+
+  // Earnings for technician
+  const [earnings, setEarnings] = useState(null);
+
+  // Unpaid fee queue for SuperAdmin/Director
+  const [unpaidFees, setUnpaidFees] = useState([]);
+  const isPayAdmin = ['SUPER_ADMIN', 'DIRECTOR'].includes(user?.role);
 
   const isTechnician = user?.role === 'SURVEY_TECHNICIAN';
   const canApprove = ['DIRECTOR', 'SALES_EXECUTIVE', 'SUPER_ADMIN'].includes(user?.role);
@@ -48,6 +58,19 @@ export default function SurveysPage({ user, onNavigate }) {
   useEffect(() => {
     loadSurveys();
   }, [activeTab]);
+
+  useEffect(() => {
+    if (isTechnician && user?.id) {
+      api.get(`/surveys/earnings/${user.id}`)
+        .then((r) => setEarnings(r.data.data))
+        .catch(() => {});
+    }
+    if (isPayAdmin) {
+      api.get('/surveys/unpaid-fees')
+        .then((r) => setUnpaidFees(r.data.data || []))
+        .catch(() => {});
+    }
+  }, [surveys]);
 
   async function loadSurveys() {
     setLoading(true);
@@ -134,6 +157,30 @@ export default function SurveysPage({ user, onNavigate }) {
     }
   }
 
+  async function handleMarkPaid(surveyId) {
+    setBusy(true);
+    try {
+      await api.post(`/surveys/${surveyId}/mark-paid`);
+      loadSurveys();
+    } catch (err) {
+      alert(errorText(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handlePayAllForTechnician(surveyIds) {
+    setBusy(true);
+    try {
+      await Promise.all(surveyIds.map((id) => api.post(`/surveys/${id}/mark-paid`)));
+      loadSurveys();
+    } catch (err) {
+      alert(errorText(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function handleRejectSubmit(e) {
     e.preventDefault();
     if (!selectedSurvey) return;
@@ -166,6 +213,106 @@ export default function SurveysPage({ user, onNavigate }) {
           </p>
         </div>
       </div>
+
+      {/* Technician Earnings Summary */}
+      {isTechnician && earnings && (
+        <div className="panel p-4 mb-4 flex flex-wrap gap-4 items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Wallet size={20} className="text-emerald-600" />
+            <span className="font-bold text-slate-800">My Visit Earnings</span>
+          </div>
+          <div className="flex gap-6 text-center text-sm">
+            <div>
+              <div className="text-slate-500 text-xs">Total Earned</div>
+              <div className="font-bold text-slate-900">{money(earnings.totalEarned)}</div>
+            </div>
+            <div>
+              <div className="text-emerald-600 text-xs">Paid Out</div>
+              <div className="font-bold text-emerald-700">{money(earnings.totalPaid)}</div>
+            </div>
+            <div>
+              <div className="text-amber-600 text-xs">Pending</div>
+              <div className="font-bold text-amber-700">{money(earnings.totalPending)}</div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* SuperAdmin / Director: Pending Visit Fee Payouts */}
+      {isPayAdmin && unpaidFees.length > 0 && (
+        <div className="panel p-5 mb-4">
+          <div className="flex justify-between items-center mb-4">
+            <div>
+              <h3 className="font-bold text-slate-800 flex items-center gap-2">
+                <IndianRupee size={18} className="text-amber-600" />
+                Pending Visit Fee Payouts
+              </h3>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Pay survey technicians for their approved site visits.
+              </p>
+            </div>
+            <span className="text-xs font-bold text-amber-700 bg-amber-100 px-3 py-1 rounded-full">
+              {unpaidFees.reduce((s, g) => s + g.surveys.length, 0)} visit{unpaidFees.reduce((s, g) => s + g.surveys.length, 0) !== 1 ? 's' : ''} unpaid
+            </span>
+          </div>
+
+          <div className="space-y-4">
+            {unpaidFees.map((group) => (
+              <div key={group.technician.id} className="border rounded p-4 bg-amber-50">
+                <div className="flex justify-between items-center mb-3">
+                  <div>
+                    <p className="font-bold text-slate-900">{group.technician.name}</p>
+                    <p className="text-xs text-slate-500">{group.technician.phone} · {group.surveys.length} pending visit{group.surveys.length !== 1 ? 's' : ''}</p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="text-lg font-bold text-amber-700">{money(group.total)}</span>
+                    <button
+                      className="button primary small-button"
+                      style={{ background: '#059669' }}
+                      disabled={busy}
+                      onClick={() => handlePayAllForTechnician(group.surveys.map((s) => s.id))}
+                    >
+                      <IndianRupee size={13} /> Pay ₹{group.total.toLocaleString('en-IN')}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Individual visits */}
+                <div className="space-y-1">
+                  {group.surveys.map((sv) => (
+                    <div key={sv.id} className="flex justify-between items-center text-xs bg-white p-2 rounded border">
+                      <div>
+                        <span className="font-semibold">{sv.lead?.name}</span>
+                        <span className="text-slate-400 ml-2">{sv.lead?.city}</span>
+                        <span className="text-slate-400 ml-2">
+                          · Approved {sv.reviewedAt ? new Date(sv.reviewedAt).toLocaleDateString('en-IN') : '—'}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-amber-700">{money(sv.visitFee)}</span>
+                        <button
+                          className="text-xs px-2 py-0.5 rounded border border-emerald-600 text-emerald-700 hover:bg-emerald-50"
+                          disabled={busy}
+                          onClick={() => handleMarkPaid(sv.id)}
+                        >
+                          Mark Paid
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {isPayAdmin && unpaidFees.length === 0 && (
+        <div className="panel p-4 mb-4 flex items-center gap-3 text-emerald-700 bg-emerald-50">
+          <IndianRupee size={18} />
+          <span className="text-sm font-semibold">All survey visit fees are paid up — no pending payouts.</span>
+        </div>
+      )}
 
       {/* Filter Tabs */}
       <div className="status-tab-bar mb-4">
@@ -246,6 +393,17 @@ export default function SurveysPage({ user, onNavigate }) {
                       <span>System: <strong>{item.recommendedSystemType?.replace('_', '-')}</strong></span>
                     </div>
                   )}
+
+                  {/* Visit Fee Badge (shown on approved surveys) */}
+                  {item.status === 'APPROVED' && item.visitFee != null && (
+                    <div className={`mt-2 text-xs font-semibold p-2 rounded flex justify-between items-center ${item.visitFeePaid ? 'bg-emerald-50 text-emerald-800' : 'bg-amber-50 text-amber-800'}`}>
+                      <span className="flex items-center gap-1">
+                        <IndianRupee size={12} />
+                        Visit Fee: <strong>{money(item.visitFee)}</strong>
+                      </span>
+                      <span>{item.visitFeePaid ? '✓ Paid' : '⏳ Pending Payment'}</span>
+                    </div>
+                  )}
                 </div>
 
                 {/* Actions Bar */}
@@ -298,6 +456,21 @@ export default function SurveysPage({ user, onNavigate }) {
                       <Zap size={14} /> Prepare Quote BOM
                     </button>
                   )}
+
+                  {/* SuperAdmin / Director: Mark visit fee as paid */}
+                  {['SUPER_ADMIN', 'DIRECTOR'].includes(user?.role) &&
+                    item.status === 'APPROVED' &&
+                    item.visitFee != null &&
+                    !item.visitFeePaid && (
+                      <button
+                        className="button primary small-button"
+                        style={{ background: '#059669' }}
+                        disabled={busy}
+                        onClick={() => handleMarkPaid(item.id)}
+                      >
+                        <IndianRupee size={13} /> Mark Visit Fee Paid
+                      </button>
+                    )}
                 </div>
               </div>
             ))}

@@ -18,6 +18,7 @@ import WarrantyRegistryPage from '../pages/WarrantyRegistryPage.jsx';
 import CustomerPortalPage from '../pages/CustomerPortalPage.jsx';
 import SharedReportPage from '../pages/SharedReportPage.jsx';
 import TeamPage from '../pages/TeamPage.jsx';
+import SettingsPage from '../pages/SettingsPage.jsx';
 
 import '../styles.css';
 import { api } from '../shared/api.js';
@@ -56,6 +57,7 @@ const sectionTitles = {
   warranties: 'Official Hardware Warranty Registry',
   tickets: 'Customer Breakdown & Warranty Claims',
   'customer-portal': 'My Rooftop Solar Journey',
+  settings: 'System Settings',
 };
 
 function AppShell({ user, onLogout }) {
@@ -109,6 +111,7 @@ function AppShell({ user, onLogout }) {
           {section === 'tickets' && <SupportTicketsPage user={user} onNavigate={setSection} />}
           {section === 'customer-portal' && <CustomerPortalPage user={user} onNavigate={setSection} />}
           {section === 'team' && <TeamPage user={user} onNavigate={setSection} />}
+          {section === 'settings' && <SettingsPage user={user} onNavigate={setSection} />}
         </div>
       </main>
     </div>

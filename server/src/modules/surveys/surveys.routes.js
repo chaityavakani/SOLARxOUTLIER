@@ -9,6 +9,7 @@ import { parsePaging } from '../../core/pagination.js';
 import { upload } from '../../core/upload.js';
 import {
   createSurvey, getSurvey, listSurveys, rescheduleSurvey, reviewSurvey, startSurvey, submitSurvey,
+  getTechnicianEarnings, markVisitFeePaid, listUnpaidVisitFees,
 } from './surveys.service.js';
 
 export const surveysRouter = Router();
@@ -41,6 +42,20 @@ surveysRouter.post(
     }),
   }),
   asyncHandler(async (req, res) => created(res, await createSurvey(req.body, req.user)))
+);
+
+// All unpaid visit fees — SuperAdmin payout queue (must be before /:id)
+surveysRouter.get(
+  '/unpaid-fees',
+  requireRole('SUPER_ADMIN', 'DIRECTOR'),
+  asyncHandler(async (_req, res) => ok(res, await listUnpaidVisitFees()))
+);
+
+// Technician earnings summary (must be before /:id)
+surveysRouter.get(
+  '/earnings/:technicianId',
+  requireRole('SURVEY_TECHNICIAN', 'SUPER_ADMIN', 'DIRECTOR'),
+  asyncHandler(async (req, res) => ok(res, await getTechnicianEarnings(req.params.technicianId, req.user)))
 );
 
 surveysRouter.get(
@@ -98,4 +113,11 @@ surveysRouter.patch(
   requireRole('SALES_EXECUTIVE', 'DIRECTOR'),
   validate({ body: z.object({ scheduledAt: z.string().min(1) }) }),
   asyncHandler(async (req, res) => ok(res, await rescheduleSurvey(req.params.id, req.body.scheduledAt)))
+);
+
+// SuperAdmin marks visit fee(s) as paid
+surveysRouter.post(
+  '/:id/mark-paid',
+  requireRole('SUPER_ADMIN', 'DIRECTOR'),
+  asyncHandler(async (req, res) => ok(res, await markVisitFeePaid(req.params.id, req.user)))
 );
