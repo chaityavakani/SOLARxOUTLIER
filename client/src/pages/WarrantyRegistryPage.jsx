@@ -49,11 +49,11 @@ export default function WarrantyRegistryPage() {
       {/* Top Banner */}
       <div className="welcome-card mb-4">
         <div>
-          <p className="eyebrow text-amber-400">AUTOMATIC 20-YEAR & 2-YEAR WARRANTY CLOCK (SCENE 3)</p>
+          <p className="eyebrow text-amber-400">AUTOMATIC WARRANTY CLOCK — STARTS AT DELIVERY CONFIRMATION</p>
           <h2>Official Solar Hardware Warranty Registry</h2>
           <p>
-            Warranties start automatically upon delivery: 20 years for Solar Panels, 2 years for Inverters and Batteries.
-            All serial numbers are permanently recorded in the digital register.
+            Warranty clock starts the exact moment delivery is confirmed on-site. Duration is set per product
+            (e.g. 240 months for panels, 24 months for inverters). All serial numbers are permanently recorded.
           </p>
         </div>
       </div>
@@ -143,12 +143,17 @@ export default function WarrantyRegistryPage() {
                       <small className="muted">{w.customer?.phone}</small>
                     </td>
                     <td>{w.project?.code || '—'}</td>
-                    <td>{new Date(w.startDate).toLocaleDateString('en-IN')}</td>
+                    <td>
+                      <span>{new Date(w.startDate).toLocaleDateString('en-IN')}</span>
+                      <small className="muted block">{new Date(w.startDate).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}</small>
+                    </td>
                     <td><strong>{new Date(w.endDate).toLocaleDateString('en-IN')}</strong></td>
                     <td>
                       {w.isUnderWarranty ? (
                         <span className="text-emerald-700 font-semibold">
-                          {Math.floor(w.daysRemaining / 365)} yrs {Math.floor((w.daysRemaining % 365) / 30)} mos remaining
+                          {w.daysRemaining >= 365
+                            ? `${Math.floor(w.daysRemaining / 365)} yr${Math.floor(w.daysRemaining / 365) > 1 ? 's' : ''} ${Math.floor((w.daysRemaining % 365) / 30)} mo`
+                            : `${w.daysRemaining} days`} remaining
                         </span>
                       ) : (
                         <span className="text-red-700 font-semibold">Expired</span>
@@ -207,20 +212,48 @@ export default function WarrantyRegistryPage() {
                 <strong className="text-sm">{selectedWarranty.customer?.name}</strong>
               </div>
               <div>
+                <span className="muted block">Contact Number:</span>
+                <strong className="text-sm">{selectedWarranty.customer?.phone || '—'}</strong>
+              </div>
+              <div>
                 <span className="muted block">Installation Site:</span>
-                <strong className="text-sm">{selectedWarranty.customer?.city || 'Gujarat, India'}</strong>
+                <strong className="text-sm">
+                  {[selectedWarranty.customer?.addressLine, selectedWarranty.customer?.city, selectedWarranty.customer?.state]
+                    .filter(Boolean).join(', ') || '—'}
+                </strong>
+              </div>
+              <div>
+                <span className="muted block">Project Code:</span>
+                <strong className="text-sm">{selectedWarranty.project?.code || '—'}</strong>
               </div>
               <div>
                 <span className="muted block">Product Model:</span>
                 <strong className="text-sm">{selectedWarranty.serialUnit?.product?.name}</strong>
               </div>
               <div>
+                <span className="muted block">Category:</span>
+                <strong className="text-sm">{selectedWarranty.serialUnit?.product?.category || '—'}</strong>
+              </div>
+              <div>
                 <span className="muted block">Serial Number:</span>
                 <strong className="text-sm font-mono text-amber-900">{selectedWarranty.serialUnit?.serialNumber}</strong>
               </div>
               <div>
-                <span className="muted block">Coverage Start Date (Delivery):</span>
-                <strong className="text-sm">{new Date(selectedWarranty.startDate).toLocaleDateString('en-IN')}</strong>
+                <span className="muted block">Warranty Duration:</span>
+                <strong className="text-sm">
+                  {selectedWarranty.warrantyMonths >= 12
+                    ? `${selectedWarranty.warrantyMonths / 12} Year${selectedWarranty.warrantyMonths / 12 > 1 ? 's' : ''}`
+                    : `${selectedWarranty.warrantyMonths} Months`}
+                </strong>
+              </div>
+              <div>
+                <span className="muted block">Warranty Start (Delivery Confirmed):</span>
+                <strong className="text-sm">
+                  {new Date(selectedWarranty.startDate).toLocaleDateString('en-IN')}{' '}
+                  <span style={{color:'var(--muted)',fontWeight:400}}>
+                    {new Date(selectedWarranty.startDate).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                </strong>
               </div>
               <div>
                 <span className="muted block">Warranty Expiry Date:</span>

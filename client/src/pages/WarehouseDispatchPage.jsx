@@ -12,6 +12,8 @@ import {
   ArrowRight,
   Send,
   Scan,
+  Navigation,
+  MapPin,
 } from 'lucide-react';
 import { api, errorText } from '../shared/api.js';
 import { money } from '../shared/formatters.js';
@@ -502,17 +504,50 @@ export default function WarehouseDispatchPage({ user, onNavigate }) {
               {message && <p className="form-message error mb-3">{message}</p>}
 
               {/* Status Header */}
-              <div className="flex justify-between items-center p-3 bg-slate-50 rounded mb-4">
-                <div>
-                  <span className="text-xs muted">Dispatch Status:</span>
-                  <div className="mt-1"><StatusBadge status={selectedDispatch.status} /></div>
-                </div>
-                {selectedDispatch.vehicleNo && (
-                  <div className="text-sm">
-                    <span className="muted block">Vehicle & Driver:</span>
-                    <strong>{selectedDispatch.vehicleNo} · {selectedDispatch.driverName} ({selectedDispatch.driverPhone})</strong>
+              <div className="p-3 bg-slate-50 rounded mb-4">
+                <div className="flex justify-between items-start gap-3">
+                  <div>
+                    <span className="text-xs muted">Dispatch Status:</span>
+                    <div className="mt-1"><StatusBadge status={selectedDispatch.status} /></div>
                   </div>
-                )}
+                  {selectedDispatch.vehicleNo && (
+                    <div className="text-sm text-right">
+                      <span className="muted block">Vehicle & Driver:</span>
+                      <strong>{selectedDispatch.vehicleNo} · {selectedDispatch.driverName} ({selectedDispatch.driverPhone})</strong>
+                    </div>
+                  )}
+                </div>
+
+                {/* Delivery Address + Maps Button */}
+                {(() => {
+                  const c = selectedDispatch.project?.customer;
+                  const parts = [
+                    selectedDispatch.project?.siteAddress,
+                    c?.addressLine,
+                    c?.city,
+                    c?.state,
+                    c?.pincode,
+                  ].filter(Boolean);
+                  if (!parts.length) return null;
+                  const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(parts.join(', '))}`;
+                  return (
+                    <div className="mt-3 pt-3 border-t flex items-start justify-between gap-3">
+                      <div>
+                        <span className="text-xs muted flex items-center gap-1 mb-1"><MapPin size={12} /> Delivery Address</span>
+                        <p className="text-sm font-semibold" style={{margin:0}}>{parts.join(', ')}</p>
+                      </div>
+                      <a
+                        href={mapsUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="button outline small-button"
+                        style={{color:'#1a73e8',borderColor:'#1a73e8',gap:5,textDecoration:'none',whiteSpace:'nowrap',flexShrink:0}}
+                      >
+                        <Navigation size={14} /> Open in Maps
+                      </a>
+                    </div>
+                  );
+                })()}
               </div>
 
               {/* Barcode / Serial Scanner Field */}
@@ -688,7 +723,7 @@ export default function WarehouseDispatchPage({ user, onNavigate }) {
 
                 {selectedDispatch.status === 'DELIVERED' && (
                   <div className="text-emerald-700 font-semibold flex items-center gap-1 text-sm">
-                    <CheckCircle2 size={16} /> Delivered on Site! 20-Year Panel & 2-Year Inverter Warranties Active.
+                    <CheckCircle2 size={16} /> Delivered on site. Warranties are active from delivery date.
                   </div>
                 )}
               </div>

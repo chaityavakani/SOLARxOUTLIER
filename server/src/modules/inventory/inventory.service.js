@@ -39,17 +39,20 @@ export async function listAvailableSerialsByProducts(productIds) {
   });
 }
 
-export async function listWarranties(q) {
-  const where = q
-    ? {
-        OR: [
-          { serialUnit: { serialNumber: { contains: q, mode: 'insensitive' } } },
-          { customer: { name: { contains: q, mode: 'insensitive' } } },
-          { customer: { phone: { contains: q, mode: 'insensitive' } } },
-          { project: { code: { contains: q, mode: 'insensitive' } } },
-        ],
-      }
-    : undefined;
+export async function listWarranties(q, customerId) {
+  const searchConditions = q
+    ? [
+        { serialUnit: { serialNumber: { contains: q, mode: 'insensitive' } } },
+        { customer: { name: { contains: q, mode: 'insensitive' } } },
+        { customer: { phone: { contains: q, mode: 'insensitive' } } },
+        { project: { code: { contains: q, mode: 'insensitive' } } },
+      ]
+    : null;
+
+  const where = {
+    ...(customerId ? { customerId } : {}),
+    ...(searchConditions ? { OR: searchConditions } : {}),
+  };
 
   const now = new Date();
   const warranties = await prisma.warranty.findMany({
@@ -57,18 +60,20 @@ export async function listWarranties(q) {
     include: {
       serialUnit: { include: { product: true } },
       customer: true,
-      project: true,
+      project: { include: { customer: true } },
     },
     orderBy: { endDate: 'asc' },
   });
 
   return warranties.map((w) => {
-    const isUnderWarranty = w.startDate <= now && w.endDate >= now && !w.voidReason;
-    const daysRemaining = w.endDate > now ? Math.ceil((new Date(w.endDate) - now) / (1000 * 60 * 60 * 24)) : 0;
+    const isUnderWarranty = new Date(w.startDate) <= now && new Date(w.endDate) >= now && !w.voidReason;
+    const daysRemaining = new Date(w.endDate) > now ? Math.ceil((new Date(w.endDate) - now) / (1000 * 60 * 60 * 24)) : 0;
+    const warrantyMonths = w.serialUnit?.product?.warrantyMonths || 0;
     return {
       ...w,
       isUnderWarranty,
       daysRemaining,
+      warrantyMonths,
     };
   });
 }

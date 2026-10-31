@@ -12,6 +12,7 @@ import {
   ShieldCheck,
   PenTool,
   X,
+  Navigation,
 } from 'lucide-react';
 import { api, errorText } from '../shared/api.js';
 import StatusBadge from '../components/StatusBadge.jsx';
@@ -186,6 +187,18 @@ export default function InstallationCrewPage({ user, onNavigate }) {
     }
   }
 
+  function getMapsUrl(project) {
+    const parts = [
+      project?.siteAddress,
+      project?.customer?.addressLine,
+      project?.customer?.city,
+      project?.customer?.state,
+      project?.customer?.pincode,
+    ].filter(Boolean);
+    if (!parts.length) return null;
+    return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(parts.join(', '))}`;
+  }
+
   return (
     <div className="installation-page">
       {/* Top Banner */}
@@ -343,7 +356,11 @@ export default function InstallationCrewPage({ user, onNavigate }) {
                     </span>
                     <h3 className="text-lg font-bold text-slate-900 mt-1">{job.project?.customer?.name}</h3>
                     <p className="text-xs muted flex items-center gap-1 mt-0.5">
-                      <MapPin size={12} /> {job.project?.siteAddress || job.project?.customer?.addressLine || 'Site Address'}
+                      <MapPin size={12} />
+                      <span>
+                        {[job.project?.siteAddress, job.project?.customer?.addressLine, job.project?.customer?.city, job.project?.customer?.state, job.project?.customer?.pincode]
+                          .filter(Boolean).join(', ') || 'Site Address'}
+                      </span>
                     </p>
                     <p className="text-xs muted flex items-center gap-1 mt-0.5">
                       <Phone size={12} /> {job.project?.customer?.phone}
@@ -380,34 +397,49 @@ export default function InstallationCrewPage({ user, onNavigate }) {
                 )}
 
                 {/* Actions */}
-                <div className="mt-4 pt-3 border-t flex justify-end gap-2">
-                  {['UNSCHEDULED', 'SCHEDULED'].includes(job.status) && (
-                    <button
-                      className="button primary small-button"
-                      disabled={busy}
-                      onClick={() => handleStartJob(job.id)}
+                <div className="mt-4 pt-3 border-t flex flex-wrap justify-between gap-2">
+                  {/* Google Maps navigation */}
+                  {getMapsUrl(job.project) && (
+                    <a
+                      href={getMapsUrl(job.project)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="button outline small-button"
+                      style={{color:'#1a73e8',borderColor:'#1a73e8',gap:5,textDecoration:'none'}}
                     >
-                      <Zap size={14} /> Start Installation (Clock On)
-                    </button>
+                      <Navigation size={14} /> Get Directions
+                    </a>
                   )}
 
-                  {job.status === 'IN_PROGRESS' && (
-                    <button
-                      className="button primary small-button bg-emerald-600 text-white"
-                      onClick={() => openCompletionModal(job)}
-                    >
-                      <PenTool size={14} /> Complete & Sign Off with Customer
-                    </button>
-                  )}
+                  <div className="flex gap-2 ml-auto">
+                    {['UNSCHEDULED', 'SCHEDULED'].includes(job.status) && (
+                      <button
+                        className="button primary small-button"
+                        disabled={busy}
+                        onClick={() => handleStartJob(job.id)}
+                      >
+                        <Zap size={14} /> Start Installation (Clock On)
+                      </button>
+                    )}
 
-                  {job.status === 'COMPLETED' && (
-                    <button
-                      className="button outline small-button text-xs"
-                      onClick={() => onNavigate('projects')}
-                    >
-                      View in Projects
-                    </button>
-                  )}
+                    {job.status === 'IN_PROGRESS' && (
+                      <button
+                        className="button primary small-button bg-emerald-600 text-white"
+                        onClick={() => openCompletionModal(job)}
+                      >
+                        <PenTool size={14} /> Complete & Sign Off with Customer
+                      </button>
+                    )}
+
+                    {job.status === 'COMPLETED' && (
+                      <button
+                        className="button outline small-button text-xs"
+                        onClick={() => onNavigate('projects')}
+                      >
+                        View in Projects
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
             ))}

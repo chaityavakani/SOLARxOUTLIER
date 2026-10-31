@@ -140,15 +140,17 @@ export async function deliverDispatch(id, receivedByName) {
     await tx.serialUnit.updateMany({ where: { dispatchId: id, status: 'DISPATCHED' }, data: { status: 'DELIVERED' } });
     const serials = await tx.serialUnit.findMany({ where: { dispatchId: id }, include: { product: true } });
     for (const serial of serials) {
+      const warrantyEnd = new Date(deliveredAt);
+      warrantyEnd.setMonth(warrantyEnd.getMonth() + serial.product.warrantyMonths);
       await tx.warranty.upsert({
         where: { serialUnitId: serial.id },
-        update: { startDate: deliveredAt, endDate: new Date(deliveredAt.getFullYear() + Math.ceil(serial.product.warrantyMonths / 12), deliveredAt.getMonth(), deliveredAt.getDate()) },
+        update: { startDate: deliveredAt, endDate: warrantyEnd },
         create: {
           serialUnitId: serial.id,
           customerId: dispatch.project.customerId,
           projectId: dispatch.projectId,
           startDate: deliveredAt,
-          endDate: new Date(deliveredAt.getFullYear() + Math.ceil(serial.product.warrantyMonths / 12), deliveredAt.getMonth(), deliveredAt.getDate()),
+          endDate: warrantyEnd,
         },
       });
     }
