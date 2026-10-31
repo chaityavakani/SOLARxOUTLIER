@@ -1,0 +1,11 @@
+node_modules/
+dist/
+.env
+.env.local
+server/uploads/
+uploads/
+*.log
+.DS_Store
+.pgdata/
+.cloud-attachments/
+.vite/

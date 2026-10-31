@@ -1,0 +1,1002 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  SUPER_ADMIN
+  DIRECTOR
+  SALES_EXECUTIVE
+  SURVEY_TECHNICIAN
+  CUSTOMER
+  WAREHOUSE_MANAGER
+  INSTALLATION_TECHNICIAN
+  SUPPORT_EXECUTIVE
+}
+
+enum CustomerType {
+  RESIDENTIAL
+  COMMERCIAL
+}
+
+enum LeadSource {
+  WEB_FORM
+  WHATSAPP
+  PHONE_CALL
+  WALK_IN
+  REFERRAL
+}
+
+enum SystemType {
+  ON_GRID
+  OFF_GRID
+  NOT_SURE
+}
+
+enum LeadStatus {
+  NEW
+  CONTACTED
+  QUALIFIED
+  NOT_QUALIFIED
+  SURVEY_SCHEDULED
+  SURVEY_DONE
+  SURVEY_APPROVED
+  SURVEY_REJECTED
+  QUOTED
+  WON
+  LOST
+}
+
+enum LeadActivityType {
+  CALL
+  NOTE
+  STATUS_CHANGE
+  WHATSAPP
+  VISIT
+}
+
+enum SurveyStatus {
+  SCHEDULED
+  IN_PROGRESS
+  SUBMITTED
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum RoofType {
+  RCC
+  METAL_SHEET
+  TILED
+  OTHER
+}
+
+enum RoofDirection {
+  N
+  NE
+  E
+  SE
+  S
+  SW
+  W
+  NW
+}
+
+enum QuoteStatus {
+  DRAFT
+  SENT
+  ACCEPTED
+  REJECTED
+  EXPIRED
+}
+
+enum ProjectStatus {
+  AWAITING_ADVANCE
+  CONFIRMED
+  PACKING
+  DISPATCHED
+  DELIVERED
+  INSTALLATION_SCHEDULED
+  INSTALLING
+  INSTALLED
+  CLOSED
+  CANCELLED
+}
+
+enum SerialStatus {
+  IN_STOCK
+  RESERVED
+  DISPATCHED
+  DELIVERED
+  UNDER_REPAIR
+  REPLACED
+  RETURNED
+  SCRAPPED
+}
+
+enum DispatchStatus {
+  PENDING
+  PACKING
+  READY
+  DISPATCHED
+  DELIVERED
+}
+
+enum InstallationStatus {
+  UNSCHEDULED
+  SCHEDULED
+  IN_PROGRESS
+  COMPLETED
+}
+
+enum TicketStatus {
+  OPEN
+  ASSIGNED
+  IN_PROGRESS
+  AWAITING_PARTS
+  RESOLVED
+  CLOSED
+  REOPENED
+}
+
+enum TicketSource {
+  PHONE
+  PORTAL
+  WHATSAPP
+  EMAIL
+}
+
+enum TicketCategory {
+  NO_POWER
+  LOW_GENERATION
+  INVERTER_FAULT
+  BATTERY_ISSUE
+  PHYSICAL_DAMAGE
+  OTHER
+}
+
+enum TicketPriority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum InvoiceType {
+  PROFORMA
+  TAX
+  SERVICE
+}
+
+enum InvoiceStatus {
+  DRAFT
+  ISSUED
+  PARTIALLY_PAID
+  PAID
+  CANCELLED
+}
+
+enum SubsidyStatus {
+  NOT_STARTED
+  DOCUMENTS_PENDING
+  APPLIED
+  INSPECTION_DONE
+  APPROVED
+  DISBURSED
+  REJECTED
+}
+
+enum ProductCategory {
+  PANEL
+  INVERTER
+  BATTERY
+  CHARGE_CONTROLLER
+  MOUNTING_STRUCTURE
+  DC_BOX
+  AC_BOX
+  CABLE
+  EARTHING
+  CONNECTOR
+  ACCESSORY
+  SERVICE
+}
+
+enum ProductUnit {
+  PCS
+  METER
+  SET
+  HOUR
+}
+
+enum PaymentType {
+  ADVANCE
+  PARTIAL
+  FINAL
+  SERVICE
+}
+
+enum PaymentMode {
+  UPI
+  BANK_TRANSFER
+  CASH
+  CHEQUE
+  CARD
+}
+
+enum ExpenseCategory {
+  TRANSPORT
+  LABOUR_EXTRA
+  CIVIL_WORK
+  MISC
+}
+
+enum PayoutStatus {
+  DRAFT
+  APPROVED
+  PAID
+}
+
+enum TimeLogEntityType {
+  SURVEY
+  INSTALLATION
+  TICKET
+}
+
+enum AttachmentEntityType {
+  SURVEY
+  INSTALLATION
+  TICKET
+  SUBSIDY
+  PURCHASE
+  PROJECT
+}
+
+enum AttachmentKind {
+  PHOTO
+  DOCUMENT
+  SIGNATURE
+}
+
+model User {
+  id           String     @id @default(cuid())
+  name         String
+  email        String?    @unique
+  phone        String?    @unique
+  passwordHash String
+  role         Role
+  isActive     Boolean    @default(true)
+  hourlyRate   Decimal?   @db.Decimal(10, 2)
+  lastLoginAt  DateTime?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  customer              Customer?
+  leadsAssigned         Lead[]            @relation("LeadAssignee")
+  leadActivities        LeadActivity[]
+  surveys               Survey[]          @relation("SurveyTechnician")
+  surveysReviewed       Survey[]          @relation("SurveyReviewer")
+  attachments           Attachment[]
+  quotesCreated         Quote[]           @relation("QuoteCreator")
+  quotesAccepted        Quote[]           @relation("QuoteAcceptor")
+  paymentsRecorded      Payment[]
+  purchasesCreated      Purchase[]
+  dispatchesPacked      Dispatch[]        @relation("DispatchPacker")
+  installationsScheduled InstallationJob[] @relation("InstallationScheduler")
+  crewAssignments       InstallationCrew[]
+  timeLogs              TimeLog[]
+  ticketsAssigned       Ticket[]          @relation("TicketAssignee")
+  ticketsCreated        Ticket[]          @relation("TicketCreator")
+  ticketActivities      TicketActivity[]
+  expensesCreated       Expense[]
+  payouts               Payout[]
+  notifications         Notification[]
+  auditLogs             AuditLog[]
+  shareLinks            ShareLink[]
+
+  @@index([role])
+}
+
+model Customer {
+  id           String       @id @default(cuid())
+  userId       String?      @unique
+  name         String
+  phone        String
+  altPhone     String?
+  email        String?
+  addressLine  String?
+  city         String?
+  state        String?
+  pincode      String?
+  customerType CustomerType @default(RESIDENTIAL)
+  notes        String?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  user       User?        @relation(fields: [userId], references: [id])
+  leads      Lead[]
+  quotes     Quote[]
+  projects   Project[]
+  payments   Payment[]
+  invoices   Invoice[]
+  tickets    Ticket[]
+  warranties Warranty[]
+
+  @@index([phone])
+  @@index([name])
+}
+
+model Lead {
+  id                   String       @id @default(cuid())
+  code                 String       @unique
+  customerId           String?
+  name                 String
+  phone                String
+  email                String?
+  address              String?
+  city                 String?
+  pincode              String?
+  source               LeadSource   @default(WEB_FORM)
+  requestedSystemType  SystemType   @default(NOT_SURE)
+  requestedCapacityKw  Decimal?     @db.Decimal(8, 2)
+  wantsSubsidy         Boolean      @default(false)
+  status               LeadStatus   @default(NEW)
+  assignedToId         String?
+  duplicateOfId        String?
+  firstContactedAt     DateTime?
+  lostReason           String?
+  roofAreaSqft         Decimal?     @db.Decimal(10, 2)
+  monthlyBillInr       Decimal?     @db.Decimal(12, 2)
+  gridConnectionOk     Boolean?
+  sanctionedLoadKw     Decimal?     @db.Decimal(8, 2)
+  qualificationNotes   String?
+  createdAt            DateTime     @default(now())
+  updatedAt            DateTime     @updatedAt
+
+  customer   Customer?  @relation(fields: [customerId], references: [id])
+  assignedTo User?      @relation("LeadAssignee", fields: [assignedToId], references: [id])
+  duplicateOf Lead?     @relation("LeadDuplicates", fields: [duplicateOfId], references: [id])
+  duplicates  Lead[]    @relation("LeadDuplicates")
+  activities LeadActivity[]
+  surveys    Survey[]
+  quotes     Quote[]
+
+  @@index([phone])
+  @@index([status])
+  @@index([assignedToId])
+}
+
+model LeadActivity {
+  id        String           @id @default(cuid())
+  leadId    String
+  userId    String?
+  type      LeadActivityType
+  message   String
+  createdAt DateTime         @default(now())
+
+  lead Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  user User? @relation(fields: [userId], references: [id])
+
+  @@index([leadId])
+}
+
+model Survey {
+  id                    String          @id @default(cuid())
+  leadId                String
+  technicianId          String
+  scheduledAt           DateTime
+  status                SurveyStatus    @default(SCHEDULED)
+  roofType              RoofType?
+  shadowFreeAreaSqft    Decimal?        @db.Decimal(10, 2)
+  roofDirection         RoofDirection?
+  tiltDegrees           Int?
+  cableDistanceMeters   Int?
+  structureHeightFt     Int?
+  earthingPointAvailable Boolean?
+  recommendedCapacityKw Decimal?        @db.Decimal(8, 2)
+  recommendedSystemType SystemType?
+  notes                 String?
+  submittedAt           DateTime?
+  reviewedById          String?
+  reviewedAt            DateTime?
+  rejectionReason       String?
+  createdAt             DateTime        @default(now())
+  updatedAt             DateTime        @updatedAt
+
+  lead       Lead  @relation(fields: [leadId], references: [id])
+  technician User  @relation("SurveyTechnician", fields: [technicianId], references: [id])
+  reviewedBy User? @relation("SurveyReviewer", fields: [reviewedById], references: [id])
+
+  @@index([leadId])
+  @@index([technicianId])
+  @@index([status])
+}
+
+model Attachment {
+  id           String                @id @default(cuid())
+  entityType   AttachmentEntityType
+  entityId     String
+  fileUrl      String
+  fileName     String
+  mimeType     String
+  sizeBytes    Int
+  kind         AttachmentKind        @default(PHOTO)
+  uploadedById String?
+  createdAt    DateTime              @default(now())
+
+  uploadedBy User? @relation(fields: [uploadedById], references: [id])
+
+  @@index([entityType, entityId])
+}
+
+model Product {
+  id             String          @id @default(cuid())
+  sku            String          @unique
+  name           String
+  category       ProductCategory
+  brand          String?
+  specs          Json?
+  unit           ProductUnit     @default(PCS)
+  isSerialized   Boolean         @default(false)
+  warrantyMonths Int             @default(12)
+  costPrice      Decimal         @db.Decimal(12, 2)
+  sellPrice      Decimal         @db.Decimal(12, 2)
+  taxPercent     Decimal         @db.Decimal(5, 2) @default(18)
+  reorderLevel   Int             @default(5)
+  stockQty       Int             @default(0)
+  isActive       Boolean         @default(true)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  kitTemplateItems KitTemplateItem[]
+  quoteItems       QuoteItem[]
+  purchaseItems    PurchaseItem[]
+  serialUnits      SerialUnit[]
+  dispatchLines    DispatchLine[]
+  ticketParts      TicketPart[]
+
+  @@index([category])
+  @@index([name])
+}
+
+model KitTemplate {
+  id          String     @id @default(cuid())
+  name        String
+  systemType  SystemType
+  capacityKw  Decimal    @db.Decimal(8, 2)
+  description String?
+  basePrice   Decimal    @db.Decimal(12, 2) @default(0)
+  isActive    Boolean    @default(true)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  items  KitTemplateItem[]
+  quotes Quote[]
+
+  @@index([systemType, capacityKw])
+}
+
+model KitTemplateItem {
+  id            String  @id @default(cuid())
+  kitTemplateId String
+  productId     String
+  quantity      Decimal @db.Decimal(10, 2)
+  notes         String?
+
+  kitTemplate KitTemplate @relation(fields: [kitTemplateId], references: [id], onDelete: Cascade)
+  product     Product     @relation(fields: [productId], references: [id])
+
+  @@unique([kitTemplateId, productId])
+}
+
+model Quote {
+  id           String      @id @default(cuid())
+  number       String      @unique
+  leadId       String
+  customerId   String
+  kitTemplateId String?
+  status       QuoteStatus @default(DRAFT)
+  systemType   SystemType
+  capacityKw   Decimal     @db.Decimal(8, 2)
+  subtotal     Decimal     @db.Decimal(12, 2) @default(0)
+  discount     Decimal     @db.Decimal(12, 2) @default(0)
+  taxTotal     Decimal     @db.Decimal(12, 2) @default(0)
+  total        Decimal     @db.Decimal(12, 2) @default(0)
+  validUntil   DateTime?
+  notes        String?
+  sentAt       DateTime?
+  acceptedAt   DateTime?
+  acceptedById String?
+  createdById  String
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  lead       Lead         @relation(fields: [leadId], references: [id])
+  customer   Customer     @relation(fields: [customerId], references: [id])
+  kitTemplate KitTemplate? @relation(fields: [kitTemplateId], references: [id])
+  acceptedBy User?        @relation("QuoteAcceptor", fields: [acceptedById], references: [id])
+  createdBy  User         @relation("QuoteCreator", fields: [createdById], references: [id])
+  items      QuoteItem[]
+  project    Project?
+
+  @@index([leadId])
+  @@index([customerId])
+  @@index([status])
+}
+
+model QuoteItem {
+  id          String  @id @default(cuid())
+  quoteId     String
+  productId   String?
+  description String
+  quantity    Decimal @db.Decimal(10, 2)
+  unitPrice   Decimal @db.Decimal(12, 2)
+  taxPercent  Decimal @db.Decimal(5, 2)
+  lineTotal   Decimal @db.Decimal(12, 2)
+
+  quote   Quote    @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  product Product? @relation(fields: [productId], references: [id])
+
+  @@index([quoteId])
+}
+
+model Project {
+  id             String        @id @default(cuid())
+  code           String        @unique
+  customerId     String
+  quoteId        String        @unique
+  status         ProjectStatus @default(AWAITING_ADVANCE)
+  systemType     SystemType
+  capacityKw     Decimal       @db.Decimal(8, 2)
+  siteAddress    String?
+  confirmedAt    DateTime?
+  deliveredAt    DateTime?
+  installedAt    DateTime?
+  closedAt       DateTime?
+  subsidyEligible Boolean      @default(false)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  customer     Customer     @relation(fields: [customerId], references: [id])
+  quote        Quote        @relation(fields: [quoteId], references: [id])
+  payments     Payment[]
+  serialUnits  SerialUnit[]
+  dispatch     Dispatch?
+  warranties   Warranty[]
+  installation InstallationJob?
+  subsidy      SubsidyApplication?
+  tickets      Ticket[]
+  invoices     Invoice[]
+  expenses     Expense[]
+
+  @@index([customerId])
+  @@index([status])
+}
+
+model Payment {
+  id            String      @id @default(cuid())
+  projectId     String?
+  invoiceId     String?
+  customerId    String
+  amount        Decimal     @db.Decimal(12, 2)
+  type          PaymentType
+  mode          PaymentMode
+  reference     String?
+  receivedAt    DateTime    @default(now())
+  recordedById  String?
+  createdAt     DateTime    @default(now())
+
+  project    Project? @relation(fields: [projectId], references: [id])
+  invoice    Invoice? @relation(fields: [invoiceId], references: [id])
+  customer   Customer @relation(fields: [customerId], references: [id])
+  recordedBy User?    @relation(fields: [recordedById], references: [id])
+
+  @@index([projectId])
+  @@index([invoiceId])
+  @@index([customerId])
+}
+
+model Supplier {
+  id        String   @id @default(cuid())
+  name      String
+  phone     String?
+  gstin     String?
+  createdAt DateTime @default(now())
+
+  purchases Purchase[]
+}
+
+model Purchase {
+  id          String   @id @default(cuid())
+  number      String   @unique
+  supplierId  String
+  invoiceRef  String?
+  purchasedAt DateTime @default(now())
+  total       Decimal  @db.Decimal(12, 2)
+  createdById String
+  createdAt   DateTime @default(now())
+
+  supplier  Supplier       @relation(fields: [supplierId], references: [id])
+  createdBy User           @relation(fields: [createdById], references: [id])
+  items     PurchaseItem[]
+
+  @@index([supplierId])
+}
+
+model PurchaseItem {
+  id         String  @id @default(cuid())
+  purchaseId String
+  productId  String
+  quantity   Int
+  unitCost   Decimal @db.Decimal(12, 2)
+
+  purchase   Purchase     @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+  product    Product      @relation(fields: [productId], references: [id])
+  serialUnits SerialUnit[]
+
+  @@index([purchaseId])
+}
+
+model SerialUnit {
+  id             String       @id @default(cuid())
+  serialNumber   String       @unique
+  productId      String
+  purchaseItemId String?
+  unitCost       Decimal      @db.Decimal(12, 2)
+  status         SerialStatus @default(IN_STOCK)
+  projectId      String?
+  dispatchId     String?
+  replacedById   String?
+  notes          String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  product      Product      @relation(fields: [productId], references: [id])
+  purchaseItem PurchaseItem? @relation(fields: [purchaseItemId], references: [id])
+  project      Project?     @relation(fields: [projectId], references: [id])
+  dispatch     Dispatch?    @relation(fields: [dispatchId], references: [id])
+  warranty     Warranty?
+  replacedBy   SerialUnit?  @relation("SerialReplacement", fields: [replacedById], references: [id])
+  replacedUnits SerialUnit[] @relation("SerialReplacement")
+  oldInTicketParts TicketPart[] @relation("OldSerial")
+  newInTicketParts TicketPart[] @relation("NewSerial")
+  tickets        Ticket[]
+
+  @@index([productId])
+  @@index([status])
+  @@index([projectId])
+}
+
+model Dispatch {
+  id             String         @id @default(cuid())
+  number         String         @unique
+  projectId      String         @unique
+  status         DispatchStatus @default(PENDING)
+  packedById     String?
+  vehicleNo      String?
+  driverName     String?
+  driverPhone    String?
+  dispatchedAt   DateTime?
+  deliveredAt    DateTime?
+  receivedByName String?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  project   Project        @relation(fields: [projectId], references: [id])
+  packedBy  User?          @relation("DispatchPacker", fields: [packedById], references: [id])
+  lines     DispatchLine[]
+  serialUnits SerialUnit[]
+
+  @@index([status])
+}
+
+model DispatchLine {
+  id          String  @id @default(cuid())
+  dispatchId  String
+  productId   String
+  requiredQty Decimal @db.Decimal(10, 2)
+  scannedQty  Int     @default(0)
+  packedQty   Int     @default(0)
+
+  dispatch Dispatch @relation(fields: [dispatchId], references: [id], onDelete: Cascade)
+  product  Product  @relation(fields: [productId], references: [id])
+
+  @@index([dispatchId])
+}
+
+model Warranty {
+  id           String   @id @default(cuid())
+  serialUnitId String   @unique
+  customerId   String
+  projectId    String?
+  startDate    DateTime
+  endDate      DateTime
+  voidReason   String?
+  createdAt    DateTime @default(now())
+
+  serialUnit SerialUnit @relation(fields: [serialUnitId], references: [id])
+  customer   Customer   @relation(fields: [customerId], references: [id])
+  project    Project?   @relation(fields: [projectId], references: [id])
+
+  @@index([customerId])
+  @@index([endDate])
+}
+
+model InstallationJob {
+  id                  String             @id @default(cuid())
+  projectId           String             @unique
+  status              InstallationStatus @default(UNSCHEDULED)
+  scheduledDate       DateTime?
+  scheduledById       String?
+  startedAt           DateTime?
+  finishedAt          DateTime?
+  confirmedCapacityKw Decimal?           @db.Decimal(8, 2)
+  generationTestKw    Decimal?           @db.Decimal(8, 2)
+  checklist           Json?
+  customerSignatureUrl String?
+  signedByName        String?
+  signedAt            DateTime?
+  remarks             String?
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+
+  project     Project            @relation(fields: [projectId], references: [id])
+  scheduledBy User?              @relation("InstallationScheduler", fields: [scheduledById], references: [id])
+  crew        InstallationCrew[]
+
+  @@index([status])
+  @@index([scheduledDate])
+}
+
+model InstallationCrew {
+  id           String  @id @default(cuid())
+  jobId        String
+  technicianId String
+  isLead       Boolean @default(false)
+
+  job        InstallationJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  technician User            @relation(fields: [technicianId], references: [id])
+
+  @@unique([jobId, technicianId])
+}
+
+model TimeLog {
+  id           String            @id @default(cuid())
+  technicianId String
+  entityType   TimeLogEntityType
+  entityId     String
+  startedAt    DateTime
+  endedAt      DateTime?
+  minutes      Int               @default(0)
+  approved     Boolean           @default(false)
+  createdAt    DateTime          @default(now())
+
+  technician User @relation(fields: [technicianId], references: [id])
+
+  @@index([technicianId])
+  @@index([entityType, entityId])
+}
+
+model Ticket {
+  id                 String         @id @default(cuid())
+  number             String         @unique
+  customerId         String
+  projectId          String?
+  serialUnitId       String?
+  source             TicketSource   @default(PHONE)
+  category           TicketCategory @default(OTHER)
+  faultCode          String?
+  description        String
+  priority           TicketPriority @default(MEDIUM)
+  status             TicketStatus   @default(OPEN)
+  isUnderWarranty    Boolean?
+  isChargeable       Boolean?
+  assignedToId       String?
+  createdById        String
+  resolvedAt         DateTime?
+  customerConfirmedAt DateTime?
+  confirmationNote   String?
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+
+  customer   Customer     @relation(fields: [customerId], references: [id])
+  project    Project?     @relation(fields: [projectId], references: [id])
+  serialUnit SerialUnit?  @relation(fields: [serialUnitId], references: [id])
+  assignedTo User?        @relation("TicketAssignee", fields: [assignedToId], references: [id])
+  createdBy  User         @relation("TicketCreator", fields: [createdById], references: [id])
+  activities TicketActivity[]
+  parts      TicketPart[]
+  invoices   Invoice[]
+
+  @@index([customerId])
+  @@index([status])
+  @@index([assignedToId])
+}
+
+model TicketActivity {
+  id        String   @id @default(cuid())
+  ticketId  String
+  userId    String?
+  type      String
+  message   String
+  createdAt DateTime @default(now())
+
+  ticket Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  user   User?  @relation(fields: [userId], references: [id])
+
+  @@index([ticketId])
+}
+
+model TicketPart {
+  id          String  @id @default(cuid())
+  ticketId    String
+  productId   String
+  quantity    Int
+  unitPrice   Decimal @db.Decimal(12, 2)
+  unitCost    Decimal @db.Decimal(12, 2)
+  oldSerialId String?
+  newSerialId String?
+  labourHours Decimal? @db.Decimal(8, 2)
+
+  ticket    Ticket      @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  product   Product     @relation(fields: [productId], references: [id])
+  oldSerial SerialUnit? @relation("OldSerial", fields: [oldSerialId], references: [id])
+  newSerial SerialUnit? @relation("NewSerial", fields: [newSerialId], references: [id])
+
+  @@index([ticketId])
+}
+
+model Invoice {
+  id         String        @id @default(cuid())
+  number     String        @unique
+  customerId String
+  projectId  String?
+  ticketId   String?
+  type       InvoiceType
+  status     InvoiceStatus @default(DRAFT)
+  issueDate  DateTime      @default(now())
+  dueDate    DateTime?
+  subtotal   Decimal       @db.Decimal(12, 2)
+  taxTotal   Decimal       @db.Decimal(12, 2)
+  total      Decimal       @db.Decimal(12, 2)
+  amountPaid Decimal       @db.Decimal(12, 2) @default(0)
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+
+  customer Customer      @relation(fields: [customerId], references: [id])
+  project  Project?      @relation(fields: [projectId], references: [id])
+  ticket   Ticket?       @relation(fields: [ticketId], references: [id])
+  lines    InvoiceLine[]
+  payments Payment[]
+
+  @@index([customerId])
+  @@index([status])
+  @@index([projectId])
+}
+
+model InvoiceLine {
+  id          String  @id @default(cuid())
+  invoiceId   String
+  description String
+  quantity    Decimal @db.Decimal(10, 2)
+  unitPrice   Decimal @db.Decimal(12, 2)
+  taxPercent  Decimal @db.Decimal(5, 2)
+  lineTotal   Decimal @db.Decimal(12, 2)
+
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@index([invoiceId])
+}
+
+model SubsidyApplication {
+  id             String        @id @default(cuid())
+  projectId      String        @unique
+  scheme         String        @default("PM Surya Ghar Muft Bijli Yojana")
+  status         SubsidyStatus @default(NOT_STARTED)
+  applicationRef String?
+  appliedAt      DateTime?
+  inspectionAt   DateTime?
+  approvedAt     DateTime?
+  disbursedAt    DateTime?
+  amountExpected Decimal?      @db.Decimal(12, 2)
+  amountReceived Decimal?      @db.Decimal(12, 2)
+  remarks        String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id])
+
+  @@index([status])
+}
+
+model Expense {
+  id          String          @id @default(cuid())
+  projectId   String?
+  ticketId    String?
+  category    ExpenseCategory
+  amount      Decimal         @db.Decimal(12, 2)
+  description String
+  spentAt     DateTime        @default(now())
+  createdById String
+  createdAt   DateTime        @default(now())
+
+  project   Project? @relation(fields: [projectId], references: [id])
+  createdBy User     @relation(fields: [createdById], references: [id])
+
+  @@index([projectId])
+}
+
+model Payout {
+  id           String       @id @default(cuid())
+  technicianId String
+  periodStart  DateTime
+  periodEnd    DateTime
+  totalMinutes Int          @default(0)
+  hourlyRate   Decimal      @db.Decimal(10, 2)
+  incentive    Decimal      @db.Decimal(12, 2) @default(0)
+  amount       Decimal      @db.Decimal(12, 2)
+  status       PayoutStatus @default(DRAFT)
+  paidAt       DateTime?
+  createdAt    DateTime     @default(now())
+
+  technician User @relation(fields: [technicianId], references: [id])
+
+  @@unique([technicianId, periodStart, periodEnd])
+}
+
+model Setting {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @updatedAt
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  title     String
+  body      String?
+  link      String?
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId, isRead])
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  userId     String?
+  action     String
+  entityType String
+  entityId   String?
+  before     Json?
+  after      Json?
+  ip         String?
+  createdAt  DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id])
+
+  @@index([entityType, entityId])
+  @@index([createdAt])
+}
+
+model ShareLink {
+  id          String   @id @default(cuid())
+  token       String   @unique
+  type        String
+  params      Json
+  expiresAt   DateTime
+  createdById String
+  createdAt   DateTime @default(now())
+
+  createdBy User @relation(fields: [createdById], references: [id])
+}
+
+model Counter {
+  key   String @id
+  value Int    @default(0)
+}

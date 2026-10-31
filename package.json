@@ -1,0 +1,22 @@
+{
+  "name": "sunpower-sims",
+  "version": "1.0.0",
+  "private": true,
+  "description": "SunPower SIMS - Solar Installation Management System",
+  "workspaces": [
+    "server",
+    "client"
+  ],
+  "scripts": {
+    "setup": "npm install && npm run db:push && npm run seed",
+    "db:push": "npm --workspace server run db:push",
+    "seed": "npm --workspace server run seed",
+    "dev": "concurrently -n server,client -c yellow,cyan \"npm --workspace server run dev\" \"npm --workspace client run dev\"",
+    "server": "npm --workspace server run dev",
+    "client": "npm --workspace client run dev",
+    "test": "npm --workspace server run test"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}
