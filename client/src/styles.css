@@ -16,6 +16,15 @@
 /* Auto-serial chips */
 .auto-serials-box{border:1px solid var(--line);border-radius:8px;padding:14px;background:#f8fafc;display:grid;gap:8px}.serial-auto-badge{display:inline-block;margin-left:8px;background:#dcfce7;color:#15803d;font-size:10px;font-weight:700;padding:2px 7px;border-radius:20px;vertical-align:middle;letter-spacing:.05em}.serial-chips-wrap{display:flex;flex-wrap:wrap;gap:6px;max-height:160px;overflow-y:auto}.serial-chip{background:#fff;border:1px solid #c7d2e0;border-radius:5px;padding:4px 10px;font-size:12px;font-family:monospace;color:#1e293b;white-space:nowrap}
 
+/* Tab bar */
+.status-tab-bar{display:flex;gap:4px;border-bottom:2px solid var(--line);margin-bottom:0}.tab-btn{border:0;background:transparent;padding:10px 20px;font-weight:600;font-size:14px;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;transition:.15s}.tab-btn.active{color:var(--ink);border-bottom-color:var(--sun)}.tab-btn:hover:not(.active){color:var(--ink)}
+
+/* Earnings summary */
+.earnings-summary-card{display:flex;justify-content:space-between;align-items:center;background:#fffcf4;border:1px solid #e9d89a;border-radius:10px;padding:20px 24px}
+
+/* data-table */
+.data-table{width:100%;border-collapse:collapse;font-size:14px}.data-table th{text-align:left;color:var(--muted);font-size:11px;letter-spacing:.08em;text-transform:uppercase;padding:10px 12px;border-bottom:1px solid var(--line)}.data-table td{padding:14px 12px;border-bottom:1px solid #eeeae2;vertical-align:middle}
+
 /* Signup page */
 .signup-panel{overflow-y:auto;max-height:100vh}.signup-panel .auth-content{max-width:520px;padding-bottom:40px}.signup-panel .auth-content form{gap:14px}.form-section-label{font-size:11px;letter-spacing:.13em;font-weight:700;color:var(--sun);text-transform:uppercase;margin:10px 0 2px}.field-error{color:var(--red);font-size:12px;font-weight:400;margin-top:2px}.password-input-wrap{position:relative;display:flex;align-items:center}.password-input-wrap input{flex:1;padding-right:40px}.password-toggle{position:absolute;right:10px;border:0;background:transparent;color:var(--muted);padding:4px;display:flex;align-items:center}.enquiry-cta-card{display:grid;gap:18px;box-shadow:0 12px 30px rgba(15,27,45,.07)}.enquiry-cta-card h3{margin:0;font-size:22px}.enquiry-cta-card p{margin:0;color:var(--muted);font-size:14px;line-height:1.5}.cta-divider{text-align:center;color:var(--muted);font-size:12px;margin:4px 0}.signup-image .signup-benefits{list-style:none;padding:0;margin:24px 0 0;display:grid;gap:12px;color:#dbe2ec;font-size:15px}.auth-switch{display:block;margin-top:16px;text-align:center;width:100%}
 @media(max-width:800px){.signup-panel{max-height:none}.signup-panel .auth-content{max-width:100%}}

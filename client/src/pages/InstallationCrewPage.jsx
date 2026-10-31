@@ -19,10 +19,15 @@ import Modal from '../components/Modal.jsx';
 import SignaturePad from '../components/SignaturePad.jsx';
 
 export default function InstallationCrewPage({ user, onNavigate }) {
+  const [activeTab, setActiveTab] = useState('JOBS');
   const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedJob, setSelectedJob] = useState(null);
   const [completeModalOpen, setCompleteModalOpen] = useState(false);
+
+  // Earnings
+  const [earnings, setEarnings] = useState(null);
+  const [earningsLoading, setEarningsLoading] = useState(false);
 
   // Field execution form
   const [checklist, setChecklist] = useState({
@@ -50,9 +55,20 @@ export default function InstallationCrewPage({ user, onNavigate }) {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
 
+  useEffect(() => { loadJobs(); }, []);
+
   useEffect(() => {
-    loadJobs();
-  }, []);
+    if (activeTab === 'EARNINGS') loadEarnings();
+  }, [activeTab]);
+
+  async function loadEarnings() {
+    setEarningsLoading(true);
+    try {
+      const res = await api.get('/installations/my-earnings');
+      setEarnings(res.data.data);
+    } catch (_) {}
+    finally { setEarningsLoading(false); }
+  }
 
   async function loadJobs() {
     setLoading(true);
@@ -183,8 +199,124 @@ export default function InstallationCrewPage({ user, onNavigate }) {
         </div>
       </div>
 
+      {/* Tabs */}
+      <div className="status-tab-bar mb-4">
+        <button className={`tab-btn ${activeTab === 'JOBS' ? 'active' : ''}`} onClick={() => setActiveTab('JOBS')}>
+          Assigned Installation Jobs
+        </button>
+        <button className={`tab-btn ${activeTab === 'EARNINGS' ? 'active' : ''}`} onClick={() => setActiveTab('EARNINGS')}>
+          My Earnings & Time Log
+        </button>
+      </div>
+
+      {/* Earnings Tab */}
+      {activeTab === 'EARNINGS' && (
+        <div className="panel p-5">
+          {earningsLoading ? (
+            <p className="muted">Loading earnings…</p>
+          ) : earnings ? (
+            <>
+              {/* Summary card */}
+              <div className="earnings-summary-card mb-5">
+                <div>
+                  <p className="eyebrow" style={{color:'var(--sun)'}}>YOUR RATE</p>
+                  <h2 style={{margin:'4px 0 0',fontFamily:'Outfit,system-ui,sans-serif'}}>
+                    ₹{Number(earnings.technician?.hourlyRate || 0).toFixed(0)}<span style={{fontSize:16,fontWeight:400,color:'var(--muted)'}}> / hour</span>
+                  </h2>
+                  {!earnings.technician?.hourlyRate && (
+                    <p className="text-xs" style={{color:'var(--red)',marginTop:4}}>Hourly rate not set — contact your Super Admin.</p>
+                  )}
+                </div>
+                <div style={{textAlign:'right'}}>
+                  <p className="text-xs muted">Total earned (all time)</p>
+                  <strong style={{fontSize:26,color:'var(--green)'}}>
+                    ₹{earnings.payouts.reduce((s, p) => s + Number(p.amount), 0).toFixed(2)}
+                  </strong>
+                </div>
+              </div>
+
+              {/* Time logs */}
+              <h3 style={{fontSize:15,fontWeight:700,marginBottom:10}}>Installation Time Log</h3>
+              {earnings.timeLogs.length === 0 ? (
+                <p className="muted text-sm">No time logs yet. Start an installation job to begin tracking.</p>
+              ) : (
+                <div className="table-wrap mb-5">
+                  <table className="data-table">
+                    <thead>
+                      <tr>
+                        <th>Date</th>
+                        <th>Started</th>
+                        <th>Finished</th>
+                        <th>Duration</th>
+                        <th>Rate</th>
+                        <th>Earned</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {earnings.timeLogs.map((log) => {
+                        const mins = log.minutes || 0;
+                        const hrs = (mins / 60).toFixed(2);
+                        const rate = Number(log.technician?.hourlyRate || 0);
+                        const earned = ((mins / 60) * rate).toFixed(2);
+                        return (
+                          <tr key={log.id}>
+                            <td>{new Date(log.startedAt).toLocaleDateString('en-IN')}</td>
+                            <td>{new Date(log.startedAt).toLocaleTimeString('en-IN', {hour:'2-digit',minute:'2-digit'})}</td>
+                            <td>{log.endedAt ? new Date(log.endedAt).toLocaleTimeString('en-IN', {hour:'2-digit',minute:'2-digit'}) : <span className="badge-amber text-xs px-2 py-0.5 rounded">In Progress</span>}</td>
+                            <td><strong>{mins} min</strong> <small className="muted">({hrs} hrs)</small></td>
+                            <td>₹{rate}/hr</td>
+                            <td><strong style={{color:'var(--green)'}}>₹{log.endedAt ? earned : '—'}</strong></td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {/* Payout records */}
+              {earnings.payouts.length > 0 && (
+                <>
+                  <h3 style={{fontSize:15,fontWeight:700,marginBottom:10}}>Payout Records</h3>
+                  <div className="table-wrap">
+                    <table className="data-table">
+                      <thead>
+                        <tr>
+                          <th>Period</th>
+                          <th>Total Minutes</th>
+                          <th>Rate</th>
+                          <th>Amount</th>
+                          <th>Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {earnings.payouts.map((p) => (
+                          <tr key={p.id}>
+                            <td>{new Date(p.periodStart).toLocaleDateString('en-IN')} — {new Date(p.periodEnd).toLocaleDateString('en-IN')}</td>
+                            <td>{p.totalMinutes} min ({(p.totalMinutes/60).toFixed(2)} hrs)</td>
+                            <td>₹{Number(p.hourlyRate)}/hr</td>
+                            <td><strong>₹{Number(p.amount).toFixed(2)}</strong></td>
+                            <td>
+                              <span className={`badge-${p.status === 'PAID' ? 'green' : p.status === 'APPROVED' ? 'blue' : 'amber'} text-xs px-2 py-0.5 rounded`}>
+                                {p.status}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              )}
+            </>
+          ) : (
+            <p className="muted">Unable to load earnings data.</p>
+          )}
+        </div>
+      )}
+
       {/* Main Jobs Queue */}
-      <div className="panel">
+      {activeTab === 'JOBS' && <div className="panel">
         <div className="panel-head mb-3">
           <div>
             <h2>Assigned Installation Jobs</h2>
@@ -281,7 +413,7 @@ export default function InstallationCrewPage({ user, onNavigate }) {
             ))}
           </div>
         )}
-      </div>
+      </div>}
 
       {/* Field Completion & Digital Signature Modal */}
       <Modal

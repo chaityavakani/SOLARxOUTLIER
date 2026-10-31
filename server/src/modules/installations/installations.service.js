@@ -36,8 +36,15 @@ export async function startInstallation(id, user) {
   if (!job) throw notFound('Installation job not found.');
   assertCrew(job, user);
   if (!['UNSCHEDULED', 'SCHEDULED'].includes(job.status)) throw badRequest('This job cannot be started.', 'INVALID_TRANSITION');
-  const updated = await prisma.installationJob.update({ where: { id }, data: { status: 'IN_PROGRESS', startedAt: new Date() }, include });
+  const startedAt = new Date();
+  const updated = await prisma.installationJob.update({ where: { id }, data: { status: 'IN_PROGRESS', startedAt }, include });
   await prisma.project.update({ where: { id: job.projectId }, data: { status: 'INSTALLING' } });
+  // Start time log for every crew member
+  for (const member of job.crew) {
+    await prisma.timeLog.create({
+      data: { technicianId: member.technicianId, entityType: 'INSTALLATION', entityId: id, startedAt },
+    });
+  }
   return updated;
 }
 
@@ -57,6 +64,34 @@ export async function completeInstallation(id, data, user) {
       include,
     });
     await tx.project.update({ where: { id: job.projectId }, data: { status: 'INSTALLED', installedAt: finishedAt } });
+
+    // Close time logs and create payout drafts for each crew member
+    for (const member of job.crew) {
+      const timeLog = await tx.timeLog.findFirst({
+        where: { technicianId: member.technicianId, entityType: 'INSTALLATION', entityId: id, endedAt: null },
+        orderBy: { startedAt: 'desc' },
+      });
+      if (timeLog) {
+        const minutes = Math.round((finishedAt - new Date(timeLog.startedAt)) / 60000);
+        await tx.timeLog.update({ where: { id: timeLog.id }, data: { endedAt: finishedAt, minutes } });
+
+        const technician = await tx.user.findUnique({ where: { id: member.technicianId } });
+        const rate = Number(technician?.hourlyRate || 0);
+        const amount = parseFloat(((minutes / 60) * rate).toFixed(2));
+
+        if (rate > 0) {
+          const periodStart = new Date(timeLog.startedAt);
+          periodStart.setHours(0, 0, 0, 0);
+          const periodEnd = new Date(finishedAt);
+          periodEnd.setHours(23, 59, 59, 999);
+          await tx.payout.upsert({
+            where: { technicianId_periodStart_periodEnd: { technicianId: member.technicianId, periodStart, periodEnd } },
+            create: { technicianId: member.technicianId, periodStart, periodEnd, totalMinutes: minutes, hourlyRate: rate, incentive: 0, amount },
+            update: { totalMinutes: { increment: minutes }, amount: { increment: amount } },
+          });
+        }
+      }
+    }
     return row;
   });
   emitEvent('installation.completed', { installationId: id, projectId: job.projectId });

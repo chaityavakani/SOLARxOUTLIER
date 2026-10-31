@@ -17,6 +17,7 @@ import SupportTicketsPage from '../pages/SupportTicketsPage.jsx';
 import WarrantyRegistryPage from '../pages/WarrantyRegistryPage.jsx';
 import CustomerPortalPage from '../pages/CustomerPortalPage.jsx';
 import SharedReportPage from '../pages/SharedReportPage.jsx';
+import TeamPage from '../pages/TeamPage.jsx';
 
 import '../styles.css';
 import { api } from '../shared/api.js';
@@ -106,6 +107,7 @@ function AppShell({ user, onLogout }) {
           {section === 'warranties' && <WarrantyRegistryPage onNavigate={setSection} />}
           {section === 'tickets' && <SupportTicketsPage user={user} onNavigate={setSection} />}
           {section === 'customer-portal' && <CustomerPortalPage user={user} onNavigate={setSection} />}
+          {section === 'team' && <TeamPage user={user} onNavigate={setSection} />}
         </div>
       </main>
     </div>

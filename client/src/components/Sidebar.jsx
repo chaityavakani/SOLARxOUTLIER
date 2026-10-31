@@ -11,12 +11,26 @@ import {
   LifeBuoy,
   LogOut,
   Boxes,
+  UserCog,
 } from 'lucide-react';
 
 export default function Sidebar({ user, currentSection, onNavigate, onLogout }) {
   const getNavLinks = (role) => {
     switch (role) {
       case 'SUPER_ADMIN':
+        return [
+          { key: 'director', label: "Director's Month-End", icon: BarChart3 },
+          { key: 'leads', label: 'Enquiries & Feasibility', icon: Users },
+          { key: 'surveys', label: 'Roof Surveys', icon: ClipboardList },
+          { key: 'quotes', label: 'Quotes & BOM', icon: Package },
+          { key: 'projects', label: 'Projects & Subsidies', icon: Home },
+          { key: 'inventory', label: 'Stock & Inward', icon: Boxes },
+          { key: 'dispatches', label: 'Dispatch & Serials', icon: Truck },
+          { key: 'installations', label: 'Installation Jobs', icon: Wrench },
+          { key: 'warranties', label: 'Warranty Registry', icon: ShieldCheck },
+          { key: 'tickets', label: 'Support & Repairs', icon: LifeBuoy },
+          { key: 'team', label: 'Team & Pay Rates', icon: UserCog },
+        ];
       case 'DIRECTOR':
         return [
           { key: 'director', label: "Director's Month-End", icon: BarChart3 },
