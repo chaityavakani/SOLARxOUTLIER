@@ -16,6 +16,12 @@
 /* Auto-serial chips */
 .auto-serials-box{border:1px solid var(--line);border-radius:8px;padding:14px;background:#f8fafc;display:grid;gap:8px}.serial-auto-badge{display:inline-block;margin-left:8px;background:#dcfce7;color:#15803d;font-size:10px;font-weight:700;padding:2px 7px;border-radius:20px;vertical-align:middle;letter-spacing:.05em}.serial-chips-wrap{display:flex;flex-wrap:wrap;gap:6px;max-height:160px;overflow-y:auto}.serial-chip{background:#fff;border:1px solid #c7d2e0;border-radius:5px;padding:4px 10px;font-size:12px;font-family:monospace;color:#1e293b;white-space:nowrap}
 
+/* Warranty folder cards */
+.warranty-folder-card{background:#fff;border:1px solid var(--line);border-radius:10px;overflow:hidden;transition:box-shadow .15s}.warranty-folder-card:hover{box-shadow:0 2px 12px rgba(15,27,45,.08)}.warranty-folder-header{width:100%;display:flex;align-items:center;gap:14px;padding:16px 20px;background:transparent;border:0;cursor:pointer;text-align:left;transition:background .12s}.warranty-folder-header:hover{background:#faf8f3}.folder-icon-wrap{flex:0 0 auto}.folder-info{flex:1;min-width:0}.folder-name{font-weight:700;font-size:16px;color:var(--ink)}.folder-meta{display:flex;flex-wrap:wrap;gap:10px;margin-top:4px;font-size:12px;color:var(--muted);align-items:center}.folder-meta span{display:inline-flex;align-items:center;gap:3px}.folder-badges{display:flex;gap:6px;flex-shrink:0}.folder-count-badge{font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px;white-space:nowrap}.folder-chevron{color:var(--muted);flex:0 0 auto}.warranty-folder-body{border-top:1px solid var(--line);padding:0 20px 16px}
+
+/* Search box */
+.search-box-wrap{position:relative;display:flex;align-items:center}.search-icon{position:absolute;left:12px;color:var(--muted);pointer-events:none}.search-input{width:100%;height:42px;border:1px solid var(--line);border-radius:8px;padding:0 14px 0 40px;font:inherit;background:#fff;color:var(--ink)}.search-input:focus{outline:none;border-color:var(--sun)}
+
 /* Tab bar */
 .status-tab-bar{display:flex;gap:4px;border-bottom:2px solid var(--line);margin-bottom:0}.tab-btn{border:0;background:transparent;padding:10px 20px;font-weight:600;font-size:14px;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;transition:.15s}.tab-btn.active{color:var(--ink);border-bottom-color:var(--sun)}.tab-btn:hover:not(.active){color:var(--ink)}
 
