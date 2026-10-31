@@ -5,7 +5,7 @@ import { ok, created } from '../../core/response.js';
 import { requireAuth } from '../../middlewares/requireAuth.js';
 import { requireRole } from '../../middlewares/requireRole.js';
 import { validate } from '../../middlewares/validate.js';
-import { createPurchase, listProducts, listSerials, listWarranties } from './inventory.service.js';
+import { createPurchase, generateNextSerials, listAvailableSerialsByProducts, listProducts, listSerials, listWarranties } from './inventory.service.js';
 
 export const inventoryRouter = Router();
 inventoryRouter.use(
@@ -14,7 +14,22 @@ inventoryRouter.use(
 );
 
 inventoryRouter.get('/products', asyncHandler(async (req, res) => ok(res, await listProducts(req.query.q))));
+inventoryRouter.get(
+  '/next-serials',
+  asyncHandler(async (req, res) => {
+    const { productId, quantity } = req.query;
+    if (!productId || !quantity) return ok(res, []);
+    ok(res, await generateNextSerials(productId, parseInt(quantity, 10)));
+  })
+);
 inventoryRouter.get('/serials', asyncHandler(async (req, res) => ok(res, await listSerials(req.query.q))));
+inventoryRouter.get(
+  '/available-serials',
+  asyncHandler(async (req, res) => {
+    const ids = req.query.productIds ? req.query.productIds.split(',').filter(Boolean) : [];
+    ok(res, await listAvailableSerialsByProducts(ids));
+  })
+);
 inventoryRouter.get('/warranties', asyncHandler(async (req, res) => ok(res, await listWarranties(req.query.q))));
 
 inventoryRouter.post(

@@ -29,6 +29,7 @@ export default function WarehouseDispatchPage({ user, onNavigate }) {
   const [dispatchDetailLoading, setDispatchDetailLoading] = useState(false);
   const [serialScanInput, setSerialScanInput] = useState('');
   const [scanning, setScanning] = useState(false);
+  const [availableSerials, setAvailableSerials] = useState([]);
 
   // Dispatch Truck Modal
   const [dispatchModalOpen, setDispatchModalOpen] = useState(false);
@@ -47,9 +48,10 @@ export default function WarehouseDispatchPage({ user, onNavigate }) {
     productId: '',
     quantity: '1',
     unitCost: '',
-    serialNumbers: '',
     supplierName: 'Adani Solar / Microtek Distributor',
   });
+  const [autoSerials, setAutoSerials] = useState([]);
+  const [serialsLoading, setSerialsLoading] = useState(false);
 
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
@@ -83,7 +85,18 @@ export default function WarehouseDispatchPage({ user, onNavigate }) {
     setSuccessMessage('');
     try {
       const res = await api.get(`/dispatches/${id}`);
-      setSelectedDispatch(res.data.data);
+      const dispatch = res.data.data;
+      setSelectedDispatch(dispatch);
+      // Load available serials for all serialized products in this dispatch
+      const serializedProductIds = (dispatch.lines || [])
+        .filter((l) => l.product?.isSerialized)
+        .map((l) => l.productId);
+      if (serializedProductIds.length > 0) {
+        const sRes = await api.get(`/inventory/available-serials?productIds=${serializedProductIds.join(',')}`);
+        setAvailableSerials(sRes.data.data || []);
+      } else {
+        setAvailableSerials([]);
+      }
     } catch (err) {
       setMessage(errorText(err));
     } finally {
@@ -104,6 +117,8 @@ export default function WarehouseDispatchPage({ user, onNavigate }) {
       setSelectedDispatch(res.data.data);
       setSuccessMessage(`Serial number ${serialScanInput.trim()} scanned and verified!`);
       setSerialScanInput('');
+      // Remove scanned serial from available list
+      setAvailableSerials((prev) => prev.filter((s) => s.serialNumber !== serialScanInput.trim()));
       loadData();
     } catch (err) {
       setMessage(errorText(err));
@@ -168,16 +183,14 @@ export default function WarehouseDispatchPage({ user, onNavigate }) {
 
   async function handleInwardStock(e) {
     e.preventDefault();
+    if (selectedProduct?.isSerialized && autoSerials.length !== Number(purchaseForm.quantity)) {
+      setMessage('Serial numbers are still generating. Please wait a moment and try again.');
+      return;
+    }
     setBusy(true);
     setMessage('');
     setSuccessMessage('');
     try {
-      const selectedProd = products.find((p) => p.id === purchaseForm.productId);
-      const serials = purchaseForm.serialNumbers
-        .split(/[\s,\n]+/)
-        .map((s) => s.trim())
-        .filter(Boolean);
-
       await api.post('/inventory/purchases', {
         supplierName: purchaseForm.supplierName,
         items: [
@@ -185,18 +198,13 @@ export default function WarehouseDispatchPage({ user, onNavigate }) {
             productId: purchaseForm.productId,
             quantity: Number(purchaseForm.quantity),
             unitCost: Number(purchaseForm.unitCost),
-            ...(selectedProd?.isSerialized ? { serialNumbers: serials } : {}),
+            ...(selectedProduct?.isSerialized ? { serialNumbers: autoSerials } : {}),
           },
         ],
       });
-      setSuccessMessage('Stock successfully received in warehouse!');
-      setPurchaseForm({
-        productId: '',
-        quantity: '1',
-        unitCost: '',
-        serialNumbers: '',
-        supplierName: 'Adani Solar / Microtek Distributor',
-      });
+      setSuccessMessage(`Stock received! ${selectedProduct?.isSerialized ? `${autoSerials.length} serial numbers registered.` : ''}`);
+      setPurchaseForm({ productId: '', quantity: '1', unitCost: '', supplierName: 'Adani Solar / Microtek Distributor' });
+      setAutoSerials([]);
       loadData();
     } catch (err) {
       setMessage(errorText(err));
@@ -206,6 +214,21 @@ export default function WarehouseDispatchPage({ user, onNavigate }) {
   }
 
   const selectedProduct = products.find((p) => p.id === purchaseForm.productId);
+
+  async function fetchAutoSerials(productId, quantity) {
+    if (!productId || !quantity || Number(quantity) < 1) { setAutoSerials([]); return; }
+    const prod = products.find((p) => p.id === productId);
+    if (!prod?.isSerialized) { setAutoSerials([]); return; }
+    setSerialsLoading(true);
+    try {
+      const res = await api.get(`/inventory/next-serials?productId=${productId}&quantity=${quantity}`);
+      setAutoSerials(res.data.data || []);
+    } catch (_) {
+      setAutoSerials([]);
+    } finally {
+      setSerialsLoading(false);
+    }
+  }
 
   return (
     <div className="warehouse-page">
@@ -329,7 +352,10 @@ export default function WarehouseDispatchPage({ user, onNavigate }) {
                   <select
                     required
                     value={purchaseForm.productId}
-                    onChange={(e) => setPurchaseForm({ ...purchaseForm, productId: e.target.value })}
+                    onChange={(e) => {
+                      setPurchaseForm({ ...purchaseForm, productId: e.target.value });
+                      fetchAutoSerials(e.target.value, purchaseForm.quantity);
+                    }}
                   >
                     <option value="">Choose product…</option>
                     {products.map((p) => (
@@ -359,7 +385,10 @@ export default function WarehouseDispatchPage({ user, onNavigate }) {
                     min="1"
                     required
                     value={purchaseForm.quantity}
-                    onChange={(e) => setPurchaseForm({ ...purchaseForm, quantity: e.target.value })}
+                    onChange={(e) => {
+                      setPurchaseForm({ ...purchaseForm, quantity: e.target.value });
+                      fetchAutoSerials(purchaseForm.productId, e.target.value);
+                    }}
                   />
                 </label>
 
@@ -377,16 +406,26 @@ export default function WarehouseDispatchPage({ user, onNavigate }) {
               </div>
 
               {selectedProduct?.isSerialized && (
-                <label>
-                  Serial Numbers (enter exactly {purchaseForm.quantity} serials, one per line or comma-separated)
-                  <textarea
-                    required
-                    rows="3"
-                    placeholder="e.g.&#10;INV-3KW-99881&#10;INV-3KW-99882"
-                    value={purchaseForm.serialNumbers}
-                    onChange={(e) => setPurchaseForm({ ...purchaseForm, serialNumbers: e.target.value })}
-                  />
-                </label>
+                <div className="auto-serials-box">
+                  <label style={{marginBottom: 6}}>
+                    Auto-Generated Serial Numbers
+                    <span className="serial-auto-badge">Auto</span>
+                  </label>
+                  {serialsLoading ? (
+                    <p className="muted text-xs">Generating serial numbers…</p>
+                  ) : autoSerials.length > 0 ? (
+                    <div className="serial-chips-wrap">
+                      {autoSerials.map((s) => (
+                        <span key={s} className="serial-chip">{s}</span>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="muted text-xs">Select a product and quantity to preview serial numbers.</p>
+                  )}
+                  <p className="text-xs muted mt-1">
+                    Serial numbers are generated automatically in sequence and are globally unique.
+                  </p>
+                </div>
               )}
 
               <button className="button primary small-button mt-2" disabled={busy}>
@@ -482,24 +521,56 @@ export default function WarehouseDispatchPage({ user, onNavigate }) {
                   <div className="flex items-center gap-2 mb-2">
                     <Barcode size={18} className="text-amber-800" />
                     <strong className="text-sm text-amber-900">
-                      Scan Inverter / Battery / Panel Serial Number (Scene 3)
+                      Select or Scan Serial Number
                     </strong>
                   </div>
                   <p className="text-xs muted mb-3">
-                    Type or scan the barcode before loading onto the delivery truck.
+                    Pick from available stock below, or type / scan a barcode manually.
                   </p>
-                  <form onSubmit={handleScanSerial} className="flex gap-2">
-                    <input
-                      type="text"
-                      required
-                      placeholder="e.g. 1234567891 or scan unit barcode…"
-                      value={serialScanInput}
-                      onChange={(e) => setSerialScanInput(e.target.value)}
-                      className="search-input flex-1"
-                    />
-                    <button type="submit" className="button primary small-button" disabled={scanning}>
-                      <Scan size={15} /> {scanning ? 'Verifying…' : 'Scan Serial'}
-                    </button>
+                  <form onSubmit={handleScanSerial} className="serial-scan-form">
+                    {/* Dropdown of available serials grouped by product */}
+                    {availableSerials.length > 0 && (
+                      <select
+                        className="search-input"
+                        value={serialScanInput}
+                        onChange={(e) => setSerialScanInput(e.target.value)}
+                      >
+                        <option value="">— Pick from available stock —</option>
+                        {(() => {
+                          const groups = {};
+                          availableSerials.forEach((s) => {
+                            const key = s.product.name;
+                            if (!groups[key]) groups[key] = [];
+                            groups[key].push(s);
+                          });
+                          return Object.entries(groups).map(([productName, units]) => (
+                            <optgroup key={productName} label={`${productName} (${units.length} available)`}>
+                              {units.map((u) => (
+                                <option key={u.id} value={u.serialNumber}>
+                                  {u.serialNumber}
+                                </option>
+                              ))}
+                            </optgroup>
+                          ));
+                        })()}
+                      </select>
+                    )}
+                    {availableSerials.length === 0 && (
+                      <p className="text-xs text-amber-800 mb-1">No stock available — receive inward stock first.</p>
+                    )}
+                    <div className="flex gap-2 mt-2">
+                      <input
+                        type="text"
+                        required
+                        placeholder="Or type / scan barcode manually…"
+                        value={serialScanInput}
+                        onChange={(e) => setSerialScanInput(e.target.value)}
+                        className="search-input flex-1"
+                      />
+                      <button type="submit" className="button primary small-button" disabled={scanning}>
+                        <Scan size={15} /> {scanning ? 'Verifying…' : 'Confirm Serial'}
+                      </button>
+                    </div>
                   </form>
                 </div>
               )}

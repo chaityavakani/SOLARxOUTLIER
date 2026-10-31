@@ -31,6 +31,14 @@ export async function listSerials(q) {
   });
 }
 
+export async function listAvailableSerialsByProducts(productIds) {
+  return prisma.serialUnit.findMany({
+    where: { productId: { in: productIds }, status: 'IN_STOCK' },
+    include: { product: true },
+    orderBy: [{ productId: 'asc' }, { serialNumber: 'asc' }],
+  });
+}
+
 export async function listWarranties(q) {
   const where = q
     ? {
@@ -63,6 +71,42 @@ export async function listWarranties(q) {
       daysRemaining,
     };
   });
+}
+
+/**
+ * Generates the next N sequential serial numbers for a product.
+ * Format: <SKU_PREFIX>-<6-digit-sequence>  e.g. INV-3KW-000042
+ * Sequence is based on the highest existing serial for that product so numbers
+ * are always unique and never reused even after deletes.
+ */
+export async function generateNextSerials(productId, quantity) {
+  const product = await prisma.product.findUnique({ where: { id: productId } });
+  if (!product) throw notFound('Product not found.');
+
+  // Build a prefix from the SKU — take the first meaningful segment
+  const prefix = product.sku.replace(/[^A-Z0-9-]/gi, '').toUpperCase();
+
+  // Find the highest existing sequence number for this product
+  const existing = await prisma.serialUnit.findMany({
+    where: { productId },
+    select: { serialNumber: true },
+  });
+
+  let maxSeq = 0;
+  for (const { serialNumber } of existing) {
+    const match = serialNumber.match(/(\d+)$/);
+    if (match) {
+      const n = parseInt(match[1], 10);
+      if (n > maxSeq) maxSeq = n;
+    }
+  }
+
+  const serials = [];
+  for (let i = 1; i <= quantity; i++) {
+    const seq = String(maxSeq + i).padStart(6, '0');
+    serials.push(`${prefix}-${seq}`);
+  }
+  return serials;
 }
 
 export async function createPurchase(data, actor) {
