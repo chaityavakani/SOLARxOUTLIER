@@ -83,13 +83,14 @@ export async function scanSerial(id, serialNumber) {
   const line = dispatch.lines.find((item) => item.productId === serial.productId);
   if (!line) throw badRequest(`${serialNumber} does not belong to this dispatch.`, 'SERIAL_PRODUCT_MISMATCH');
   if (line.scannedQty >= Number(line.requiredQty)) throw conflict('This dispatch line is already complete.', 'LINE_COMPLETE');
-  const result = await prisma.$transaction(async (tx) => {
+  await prisma.$transaction(async (tx) => {
     await tx.serialUnit.update({ where: { id: serial.id }, data: { status: 'RESERVED', projectId: dispatch.projectId, dispatchId: id } });
     await tx.dispatchLine.update({ where: { id: line.id }, data: { scannedQty: { increment: 1 } } });
     await tx.dispatch.update({ where: { id }, data: { status: 'PACKING' } });
-    return getDispatch(id);
   });
-  const complete = result.lines.every((item) => item.product.isSerialized
+  // Fetch fresh data after transaction so completion check sees updated counts
+  const fresh = await getDispatch(id);
+  const complete = fresh.lines.every((item) => item.product.isSerialized
     ? item.scannedQty >= Number(item.requiredQty)
     : item.packedQty >= Number(item.requiredQty));
   if (complete) await prisma.dispatch.update({ where: { id }, data: { status: 'READY' } });
@@ -101,11 +102,8 @@ export async function markPacked(id, lineId, quantity) {
   if (!line) throw notFound('Dispatch line not found.');
   if (quantity > Number(line.requiredQty)) throw badRequest('Packed quantity cannot exceed the required quantity.', 'INVALID_QUANTITY');
   await prisma.dispatchLine.update({ where: { id: lineId }, data: { packedQty: quantity } });
-  const lines = await prisma.dispatchLine.findMany({
-    where: { dispatchId: id },
-    include: { product: true },
-  });
-  const complete = lines.every((item) => item.product.isSerialized
+  const fresh = await getDispatch(id);
+  const complete = fresh.lines.every((item) => item.product.isSerialized
     ? item.scannedQty >= Number(item.requiredQty)
     : item.packedQty >= Number(item.requiredQty));
   if (complete) await prisma.dispatch.update({ where: { id }, data: { status: 'READY' } });

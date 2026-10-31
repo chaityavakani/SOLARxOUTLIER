@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Wrench,
   CheckCircle2,
@@ -11,6 +11,7 @@ import {
   ArrowRight,
   ShieldCheck,
   PenTool,
+  X,
 } from 'lucide-react';
 import { api, errorText } from '../shared/api.js';
 import StatusBadge from '../components/StatusBadge.jsx';
@@ -40,11 +41,11 @@ export default function InstallationCrewPage({ user, onNavigate }) {
   });
 
   const [signatureDataUrl, setSignatureDataUrl] = useState('');
-  const [photoUrls, setPhotoUrls] = useState([
-    'https://images.unsplash.com/photo-1509391365360-2e959784a276?w=600',
-    'https://images.unsplash.com/photo-1508873696983-2df57046475a?w=600',
-    'https://images.unsplash.com/photo-1558441719-8b449c6ff673?w=600',
-  ]);
+  const [capturedPhotos, setCapturedPhotos] = useState([]);
+  const [cameraOpen, setCameraOpen] = useState(false);
+  const [cameraError, setCameraError] = useState('');
+  const videoRef = useRef(null);
+  const streamRef = useRef(null);
 
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
@@ -86,7 +87,58 @@ export default function InstallationCrewPage({ user, onNavigate }) {
       remarks: 'Mounted stands, laid panels, connected boxes, completed earthing and verified power generation.',
     });
     setSignatureDataUrl('');
+    setCapturedPhotos([]);
+    setCameraOpen(false);
+    setCameraError('');
     setCompleteModalOpen(true);
+  }
+
+  async function openCamera() {
+    setCameraError('');
+    setCameraOpen(true);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } },
+        audio: false,
+      });
+      streamRef.current = stream;
+      // wait for the video element to mount
+      setTimeout(() => {
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          videoRef.current.play();
+        }
+      }, 100);
+    } catch (err) {
+      setCameraError('Camera access denied. Please allow camera permission and try again.');
+      setCameraOpen(false);
+    }
+  }
+
+  function closeCamera() {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((t) => t.stop());
+      streamRef.current = null;
+    }
+    setCameraOpen(false);
+  }
+
+  function captureFrame() {
+    if (!videoRef.current) return;
+    const video = videoRef.current;
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    canvas.getContext('2d').drawImage(video, 0, 0);
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
+    setCapturedPhotos((prev) => [
+      ...prev,
+      { dataUrl, timestamp: new Date().toLocaleTimeString('en-IN') },
+    ]);
+  }
+
+  function removePhoto(index) {
+    setCapturedPhotos((prev) => prev.filter((_, i) => i !== index));
   }
 
   async function handleCompleteJob(e) {
@@ -103,7 +155,7 @@ export default function InstallationCrewPage({ user, onNavigate }) {
         confirmedCapacityKw: Number(testForm.confirmedCapacityKw),
         generationTestKw: Number(testForm.generationTestKw),
         checklist,
-        photoUrls,
+        photoUrls: capturedPhotos.map((p) => p.dataUrl),
         signatureDataUrl,
         signedByName: testForm.signedByName,
         remarks: testForm.remarks,
@@ -234,7 +286,7 @@ export default function InstallationCrewPage({ user, onNavigate }) {
       {/* Field Completion & Digital Signature Modal */}
       <Modal
         isOpen={completeModalOpen}
-        onClose={() => setCompleteModalOpen(false)}
+        onClose={() => { closeCamera(); setCompleteModalOpen(false); }}
         title="Rooftop Installation Completion & Proof of Job"
         subtitle={`Scene 4 Form: Verify power generation and capture homeowner signature for ${selectedJob?.project?.customer?.name}.`}
         maxWidth="750px"
@@ -321,21 +373,60 @@ export default function InstallationCrewPage({ user, onNavigate }) {
             </label>
           </div>
 
-          {/* Photo uploads preview */}
-          <div className="mb-3">
-            <strong className="text-xs uppercase text-slate-700 block mb-1.5 font-bold">
-              Proof Photos Uploaded ({photoUrls.length} photos)
-            </strong>
-            <div className="flex gap-2">
-              {photoUrls.map((url, i) => (
-                <img
-                  key={i}
-                  src={url}
-                  alt={`Proof ${i + 1}`}
-                  className="w-20 h-16 object-cover rounded border"
-                />
-              ))}
+          {/* Live Camera Capture — getUserMedia, no file picker */}
+          <div className="live-camera-section">
+            <div className="live-camera-header">
+              <Camera size={15} />
+              <strong>Live Site Photos ({capturedPhotos.length} captured)</strong>
+              <span className="live-badge">LIVE ONLY</span>
             </div>
+            <p className="text-xs muted">
+              Opens your camera directly — no file or gallery access, photos are always taken live on-site.
+            </p>
+
+            {cameraError && <p className="text-xs" style={{color:'var(--red)'}}>{cameraError}</p>}
+
+            {/* Live video viewfinder */}
+            {cameraOpen && (
+              <div className="camera-viewfinder">
+                <video ref={videoRef} autoPlay playsInline muted className="camera-video" />
+                <div className="camera-controls">
+                  <button type="button" className="camera-shutter" onClick={captureFrame} title="Take photo">
+                    <Camera size={22} />
+                  </button>
+                  <button type="button" className="camera-close" onClick={closeCamera} title="Close camera">
+                    <X size={16} /> Close
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {!cameraOpen && (
+              <button type="button" className="button outline small-button" onClick={openCamera}>
+                <Camera size={14} /> Open Live Camera
+              </button>
+            )}
+
+            {capturedPhotos.length > 0 && (
+              <div className="captured-photos-grid">
+                {capturedPhotos.map((photo, i) => (
+                  <div key={i} className="captured-photo-item">
+                    <img src={photo.dataUrl} alt={`Site photo ${i + 1}`} />
+                    <div className="captured-photo-meta">
+                      <span>Photo {i + 1}</span>
+                      <span style={{color:'var(--green)'}}>{photo.timestamp}</span>
+                    </div>
+                    <button type="button" className="captured-photo-remove" onClick={() => removePhoto(i)}>
+                      <X size={12} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {capturedPhotos.length === 0 && !cameraOpen && (
+              <p className="text-xs muted">No photos captured yet. At least 1 photo recommended.</p>
+            )}
           </div>
 
           <label>
