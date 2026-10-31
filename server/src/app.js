@@ -16,7 +16,15 @@ export function createApp() {
   app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
   app.use(
     cors({
-      origin: env.CLIENT_URL.split(',').map((s) => s.trim()),
+      origin: (origin, cb) => {
+        // In development allow any localhost port so Vite port-bumps never block the app.
+        const allowed = env.CLIENT_URL.split(',').map((s) => s.trim());
+        const isLocalhost = !origin || /^https?:\/\/localhost(:\d+)?$/.test(origin);
+        const isDev = env.NODE_ENV !== 'production';
+        if (isDev && isLocalhost) return cb(null, true);
+        if (allowed.includes(origin)) return cb(null, true);
+        cb(new Error(`CORS: origin ${origin} not allowed`));
+      },
       credentials: true,
     })
   );
