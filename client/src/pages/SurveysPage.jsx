@@ -95,6 +95,18 @@ export default function SurveysPage({ user, onNavigate }) {
   async function handleReportSubmit(e) {
     e.preventDefault();
     if (!selectedSurvey) return;
+    setMessage('');
+    const area = Number(reportForm.shadowFreeAreaSqft);
+    const tilt = Number(reportForm.tiltDegrees);
+    const cable = Number(reportForm.cableDistanceMeters);
+    const height = Number(reportForm.structureHeightFt);
+    if (!area || area < 50) return setMessage('Shadow-free area must be at least 50 sq ft.');
+    if (area > 50000) return setMessage('Shadow-free area seems too large — please verify.');
+    if (tilt < 0 || tilt > 90) return setMessage('Roof tilt must be between 0° and 90°.');
+    if (!cable || cable < 1) return setMessage('Cable distance must be at least 1 metre.');
+    if (cable > 500) return setMessage('Cable distance seems too long — please verify.');
+    if (!height || height < 1) return setMessage('Structure height must be at least 1 ft.');
+    if (height > 200) return setMessage('Structure height seems too high — please verify.');
     setBusy(true);
     setMessage('');
     try {
@@ -125,9 +137,13 @@ export default function SurveysPage({ user, onNavigate }) {
   async function handleRejectSubmit(e) {
     e.preventDefault();
     if (!selectedSurvey) return;
+    if (!rejectReason.trim() || rejectReason.trim().length < 10) {
+      alert('Please provide a rejection reason (at least 10 characters).');
+      return;
+    }
     setBusy(true);
     try {
-      await api.post(`/surveys/${selectedSurvey.id}/reject`, { reason: rejectReason });
+      await api.post(`/surveys/${selectedSurvey.id}/reject`, { reason: rejectReason.trim() });
       setRejectModalOpen(false);
       setRejectReason('');
       loadSurveys();

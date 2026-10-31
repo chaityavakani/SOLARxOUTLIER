@@ -20,9 +20,12 @@ export default function Login({ onSuccess, onBack, onSignup }) {
 
   async function login(identifierValue = identifier) {
     setError('');
+    const id = identifierValue.trim();
+    if (!id) return setError('Enter your email or phone number.');
+    if (!password || password.length < 6) return setError('Enter your password.');
     setBusy(true);
     try {
-      const { data } = await api.post('/auth/login', { identifier: identifierValue, password });
+      const { data } = await api.post('/auth/login', { identifier: id, password });
       onSuccess(data.data.user);
     } catch (loginError) {
       setError(errorText(loginError));

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { ArrowRight, Eye, EyeOff } from 'lucide-react';
 import { api, errorText } from '../shared/api.js';
+import { detectGibberish } from '../shared/gibberish.js';
 
 export default function SignupPage({ onSuccess, onBack, onLogin }) {
   const [form, setForm] = useState({
@@ -28,16 +29,120 @@ export default function SignupPage({ onSuccess, onBack, onLogin }) {
     return (e) => setForm((prev) => ({ ...prev, [field]: e.target.value }));
   }
 
+  // Only letters, spaces, dots, hyphens, apostrophes — no random symbols or numbers
+  const NAME_RE   = /^[A-Za-zऀ-ॿ\s.''-]{2,100}$/;
+  const PLACE_RE  = /^[A-Za-zऀ-ॿ\s.''-]{2,100}$/;
+  const LETTERS_FILTER = /[^A-Za-zऀ-ॿ\s.''-]/g;
+
+  function setFieldError(field, msg) {
+    setFieldErrors((prev) => msg ? { ...prev, [field]: msg } : (({ [field]: _, ...rest }) => rest)(prev));
+  }
+
+  function handleNameChange(e) {
+    const raw = e.target.value;
+    const hasInvalid = LETTERS_FILTER.test(raw);
+    const v = raw.replace(LETTERS_FILTER, '');
+    setForm((p) => ({ ...p, name: v }));
+    if (hasInvalid) {
+      setFieldError('name', 'Name can only contain letters and spaces — no numbers or special characters.');
+    } else if (v.length > 0 && v.trim().length < 2) {
+      setFieldError('name', 'Name must be at least 2 characters.');
+    } else {
+      setFieldError('name', detectGibberish(v, 'Name'));
+    }
+  }
+
+  function handleCityChange(e) {
+    const raw = e.target.value;
+    const hasInvalid = LETTERS_FILTER.test(raw);
+    const v = raw.replace(LETTERS_FILTER, '');
+    setForm((p) => ({ ...p, city: v }));
+    if (hasInvalid) {
+      setFieldError('city', 'City name can only contain letters — no numbers or symbols.');
+    } else {
+      setFieldError('city', detectGibberish(v, 'City'));
+    }
+  }
+
+  function handleStateChange(e) {
+    const raw = e.target.value;
+    const hasInvalid = LETTERS_FILTER.test(raw);
+    const v = raw.replace(LETTERS_FILTER, '');
+    setForm((p) => ({ ...p, state: v }));
+    if (hasInvalid) {
+      setFieldError('state', 'State name can only contain letters — no numbers or symbols.');
+    } else {
+      setFieldError('state', detectGibberish(v, 'State'));
+    }
+  }
+
+  function handlePhoneChange(e) {
+    const v = e.target.value.replace(/\D/g, '').slice(0, 10);
+    setForm((p) => ({ ...p, phone: v }));
+    if (e.target.value !== v && e.target.value.length > 0) {
+      setFieldError('phone', 'Mobile number must contain digits only.');
+    } else if (v.length > 0 && v.length < 10) {
+      setFieldError('phone', `Enter a 10-digit number (${v.length}/10 digits so far).`);
+    } else {
+      setFieldError('phone', null);
+    }
+  }
+
+  function handleEmailChange(e) {
+    const v = e.target.value;
+    setForm((p) => ({ ...p, email: v }));
+    if (v.length > 5 && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) {
+      setFieldError('email', 'Enter a valid email address (e.g. you@example.com).');
+    } else {
+      setFieldError('email', null);
+    }
+  }
+
   function validate() {
     const errs = {};
-    if (!form.name.trim() || form.name.trim().length < 2) errs.name = 'Enter your full name.';
-    if (!form.email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) errs.email = 'Enter a valid email address.';
-    if (!/^[0-9]{10}$/.test(form.phone)) errs.phone = 'Enter a 10-digit mobile number.';
+    const name = form.name.trim();
+    if (!name || name.length < 2) {
+      errs.name = 'Enter your full name (at least 2 characters).';
+    } else if (!NAME_RE.test(name)) {
+      errs.name = 'Name can only contain letters and spaces — no numbers or special characters.';
+    } else {
+      errs.name = detectGibberish(name, 'Name');
+    }
+
+    if (!form.email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {
+      errs.email = 'Enter a valid email address.';
+    }
+    if (!/^[0-9]{10}$/.test(form.phone)) {
+      errs.phone = 'Enter a valid 10-digit mobile number.';
+    }
+
+    if (!form.addressLine.trim()) errs.addressLine = 'Enter your installation address.';
+
+    const city = form.city.trim();
+    if (!city) {
+      errs.city = 'Enter your city.';
+    } else if (!PLACE_RE.test(city)) {
+      errs.city = 'City name can only contain letters — no numbers or symbols.';
+    } else {
+      errs.city = detectGibberish(city, 'City');
+    }
+
+    const state = form.state.trim();
+    if (!state) {
+      errs.state = 'Enter your state.';
+    } else if (!PLACE_RE.test(state)) {
+      errs.state = 'State name can only contain letters — no numbers or symbols.';
+    } else {
+      errs.state = detectGibberish(state, 'State');
+    }
+
     if (form.password.length < 8) errs.password = 'Password must be at least 8 characters.';
     else if (!/[A-Za-z]/.test(form.password)) errs.password = 'Include at least one letter.';
     else if (!/[0-9]/.test(form.password)) errs.password = 'Include at least one number.';
     if (form.password !== form.confirmPassword) errs.confirmPassword = 'Passwords do not match.';
-    if (!form.city.trim()) errs.city = 'Enter your city.';
+
+    if (form.pincode && !/^[0-9]{6}$/.test(form.pincode)) errs.pincode = 'PIN code must be exactly 6 digits.';
+    if (!form.monthlyBill || Number(form.monthlyBill) < 100) errs.monthlyBill = 'Enter your average monthly electricity bill (min ₹100).';
     return errs;
   }
 
@@ -93,7 +198,7 @@ export default function SignupPage({ onSuccess, onBack, onLogin }) {
                 required
                 placeholder="e.g. Ramesh Patel"
                 value={form.name}
-                onChange={set('name')}
+                onChange={handleNameChange}
               />
               {fieldErrors.name && <span className="field-error">{fieldErrors.name}</span>}
             </label>
@@ -106,7 +211,7 @@ export default function SignupPage({ onSuccess, onBack, onLogin }) {
                   type="email"
                   placeholder="you@example.com"
                   value={form.email}
-                  onChange={set('email')}
+                  onChange={handleEmailChange}
                 />
                 {fieldErrors.email && <span className="field-error">{fieldErrors.email}</span>}
               </label>
@@ -117,7 +222,7 @@ export default function SignupPage({ onSuccess, onBack, onLogin }) {
                   type="tel"
                   placeholder="10-digit number"
                   value={form.phone}
-                  onChange={(e) => setForm((p) => ({ ...p, phone: e.target.value.replace(/\D/g, '').slice(0, 10) }))}
+                  onChange={handlePhoneChange}
                 />
                 {fieldErrors.phone && <span className="field-error">{fieldErrors.phone}</span>}
               </label>
@@ -127,23 +232,36 @@ export default function SignupPage({ onSuccess, onBack, onLogin }) {
             <p className="form-section-label">Installation Address</p>
 
             <label>
-              Address line
+              Address line *
               <input
+                required
                 placeholder="Flat / House no., Street, Area"
                 value={form.addressLine}
                 onChange={set('addressLine')}
               />
+              {fieldErrors.addressLine && <span className="field-error">{fieldErrors.addressLine}</span>}
             </label>
 
             <div className="form-row">
               <label>
                 City *
-                <input required placeholder="e.g. Ahmedabad" value={form.city} onChange={set('city')} />
+                <input
+                  required
+                  placeholder="e.g. Ahmedabad"
+                  value={form.city}
+                  onChange={handleCityChange}
+                />
                 {fieldErrors.city && <span className="field-error">{fieldErrors.city}</span>}
               </label>
               <label>
-                State
-                <input placeholder="e.g. Gujarat" value={form.state} onChange={set('state')} />
+                State *
+                <input
+                  required
+                  placeholder="e.g. Gujarat"
+                  value={form.state}
+                  onChange={handleStateChange}
+                />
+                {fieldErrors.state && <span className="field-error">{fieldErrors.state}</span>}
               </label>
             </div>
 

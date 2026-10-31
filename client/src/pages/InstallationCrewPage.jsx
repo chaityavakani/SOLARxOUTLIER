@@ -161,20 +161,27 @@ export default function InstallationCrewPage({ user, onNavigate }) {
   async function handleCompleteJob(e) {
     e.preventDefault();
     if (!selectedJob) return;
-    if (!signatureDataUrl) {
-      alert('Please have the homeowner sign on the screen to accept the work.');
-      return;
-    }
+    setMessage('');
+    const allChecked = Object.values(checklist).every(Boolean);
+    if (!allChecked) { setMessage('Please tick all checklist items before submitting.'); return; }
+    if (capturedPhotos.length < 3) { setMessage(`At least 3 live site photos are required. You have captured ${capturedPhotos.length}.`); return; }
+    if (!signatureDataUrl) { setMessage('Please have the homeowner sign on the screen to accept the work.'); return; }
+    const cap = Number(testForm.confirmedCapacityKw);
+    const gen = Number(testForm.generationTestKw);
+    if (!cap || cap <= 0) { setMessage('Confirmed system size must be greater than 0 kW.'); return; }
+    if (isNaN(gen) || gen < 0) { setMessage('Tested generation output must be 0 or more.'); return; }
+    if (gen > cap * 1.2) { setMessage(`Tested output (${gen} kW) cannot exceed system capacity (${cap} kW) by more than 20%.`); return; }
+    if (!testForm.signedByName.trim() || testForm.signedByName.trim().length < 2) { setMessage('Homeowner name must be at least 2 characters.'); return; }
     setBusy(true);
     setMessage('');
     try {
       await api.post(`/installations/${selectedJob.id}/complete`, {
-        confirmedCapacityKw: Number(testForm.confirmedCapacityKw),
-        generationTestKw: Number(testForm.generationTestKw),
+        confirmedCapacityKw: cap,
+        generationTestKw: gen,
         checklist,
         photoUrls: capturedPhotos.map((p) => p.dataUrl),
         signatureDataUrl,
-        signedByName: testForm.signedByName,
+        signedByName: testForm.signedByName.trim(),
         remarks: testForm.remarks,
       });
       setCompleteModalOpen(false);

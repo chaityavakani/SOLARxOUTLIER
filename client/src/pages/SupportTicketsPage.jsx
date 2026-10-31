@@ -105,10 +105,13 @@ export default function SupportTicketsPage({ user, onNavigate }) {
 
   async function handleCreateTicketSubmit(e) {
     e.preventDefault();
+    setMessage('');
+    if (!createForm.customerId) return setMessage('Please look up a customer and select their serial unit before creating a ticket.');
+    if (!createForm.description.trim() || createForm.description.trim().length < 10) return setMessage('Description must be at least 10 characters.');
     setBusy(true);
     setMessage('');
     try {
-      await api.post('/tickets', createForm);
+      await api.post('/tickets', { ...createForm, description: createForm.description.trim(), faultCode: createForm.faultCode.trim() });
       setCreateModalOpen(false);
       loadTickets();
     } catch (err) {
@@ -121,11 +124,15 @@ export default function SupportTicketsPage({ user, onNavigate }) {
   async function handleResolveSubmit(e) {
     e.preventDefault();
     if (!selectedTicket) return;
+    setMessage('');
+    const hrs = Number(resolveForm.labourHours);
+    if (isNaN(hrs) || hrs < 0) return setMessage('Labour hours must be 0 or more.');
+    if (hrs > 500) return setMessage('Labour hours seem too high — please verify.');
     setBusy(true);
     setMessage('');
     try {
       await api.post(`/tickets/${selectedTicket.id}/resolve`, {
-        labourHours: Number(resolveForm.labourHours),
+        labourHours: hrs,
         parts: resolveForm.parts,
       });
       setResolveModalOpen(false);
@@ -141,9 +148,13 @@ export default function SupportTicketsPage({ user, onNavigate }) {
   async function handleConfirmSubmit(e) {
     e.preventDefault();
     if (!selectedTicket) return;
+    if (!confirmNote.trim() || confirmNote.trim().length < 10) {
+      alert('Please provide a confirmation note (at least 10 characters).');
+      return;
+    }
     setBusy(true);
     try {
-      await api.post(`/tickets/${selectedTicket.id}/confirm`, { note: confirmNote });
+      await api.post(`/tickets/${selectedTicket.id}/confirm`, { note: confirmNote.trim() });
       setConfirmModalOpen(false);
       setSelectedTicket(null);
       loadTickets();

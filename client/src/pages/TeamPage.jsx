@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { UserCog, Save, UserPlus, X, Eye, EyeOff, Users, ChevronDown, ChevronRight } from 'lucide-react';
 import { api, errorText } from '../shared/api.js';
+import { detectGibberish } from '../shared/gibberish.js';
 import Modal from '../components/Modal.jsx';
 
 const ALL_ROLES = [
@@ -99,7 +100,13 @@ export default function TeamPage() {
   async function handleAdd(e) {
     e.preventDefault();
     setAddError('');
-    if (!form.name.trim()) return setAddError('Full name is required.');
+    if (!form.name.trim() || form.name.trim().length < 2) return setAddError('Full name must be at least 2 characters.');
+    if (form.name.trim().length > 100) return setAddError('Full name is too long (max 100 characters).');
+    const nameGibberish = detectGibberish(form.name.trim(), 'Name');
+    if (nameGibberish) return setAddError(nameGibberish);
+    if (form.phone && !/^[0-9]{10}$/.test(form.phone.trim())) return setAddError('Phone must be exactly 10 digits.');
+    if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) return setAddError('Enter a valid email address.');
+    if (form.role === 'INSTALLATION_TECHNICIAN' && form.hourlyRate && (Number(form.hourlyRate) < 0 || Number(form.hourlyRate) > 10000)) return setAddError('Hourly rate must be between ₹0 and ₹10,000.');
     if (!form.password || form.password.length < 8) return setAddError('Password must be at least 8 characters.');
     setAddBusy(true);
     try {
@@ -277,7 +284,14 @@ export default function TeamPage() {
             Full Name *
             <input
               type="text" required placeholder="e.g. Ravi Patel"
-              value={form.name} onChange={(e) => setForm({...form, name: e.target.value})}
+              value={form.name}
+              onChange={(e) => {
+                const raw = e.target.value;
+                const v = raw.replace(/[^A-Za-zऀ-ॿ\s.''-]/g, '');
+                setForm({...form, name: v});
+                if (raw !== v) setAddError('Name can only contain letters — no numbers or special characters.');
+                else if (addError && addError.startsWith('Name')) setAddError('');
+              }}
               style={{height:42,border:'1px solid #cfc8ba',borderRadius:6,padding:'0 12px',fontFamily:'inherit'}}
             />
           </label>
@@ -299,7 +313,13 @@ export default function TeamPage() {
               Phone
               <input
                 type="tel" placeholder="10-digit number"
-                value={form.phone} onChange={(e) => setForm({...form, phone: e.target.value})}
+                value={form.phone}
+                onChange={(e) => {
+                  const v = e.target.value.replace(/\D/g, '').slice(0, 10);
+                  setForm({...form, phone: v});
+                  if (e.target.value !== v && e.target.value.length > 0) setAddError('Phone number must contain digits only.');
+                  else if (addError && addError.startsWith('Phone')) setAddError('');
+                }}
                 style={{height:42,border:'1px solid #cfc8ba',borderRadius:6,padding:'0 12px',fontFamily:'inherit'}}
               />
             </label>
@@ -307,7 +327,13 @@ export default function TeamPage() {
               Email
               <input
                 type="email" placeholder="optional"
-                value={form.email} onChange={(e) => setForm({...form, email: e.target.value})}
+                value={form.email}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setForm({...form, email: v});
+                  if (v.length > 5 && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) setAddError('Enter a valid email address.');
+                  else if (addError && addError.startsWith('Enter a valid email')) setAddError('');
+                }}
                 style={{height:42,border:'1px solid #cfc8ba',borderRadius:6,padding:'0 12px',fontFamily:'inherit'}}
               />
             </label>

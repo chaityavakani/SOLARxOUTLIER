@@ -106,15 +106,21 @@ export default function ProjectsPage({ onNavigate }) {
   async function handlePaymentSubmit(e) {
     e.preventDefault();
     if (!selectedProject) return;
+    setMessage('');
+    const amt = Number(paymentForm.amount);
+    if (!amt || amt <= 0) return setMessage('Enter a valid payment amount greater than ₹0.');
+    if (amt > 50000000) return setMessage('Amount seems too high — please verify.');
+    const refRequired = ['BANK_TRANSFER', 'CHEQUE', 'NEFT', 'RTGS'].includes(paymentForm.mode);
+    if (refRequired && !paymentForm.reference.trim()) return setMessage(`Reference number / UTR is required for ${paymentForm.mode} payments.`);
     setBusy(true);
     setMessage('');
     try {
       await api.post('/payments', {
         projectId: selectedProject.id,
-        amount: Number(paymentForm.amount),
+        amount: amt,
         type: paymentForm.type,
         mode: paymentForm.mode,
-        reference: paymentForm.reference,
+        reference: paymentForm.reference.trim(),
       });
       setPaymentModalOpen(false);
       openProject(selectedProject.id);
@@ -159,14 +165,22 @@ export default function ProjectsPage({ onNavigate }) {
   async function handleSubsidySubmit(e) {
     e.preventDefault();
     if (!selectedProject) return;
+    setMessage('');
+    const needsRef = ['APPLIED', 'APPROVED', 'RECEIVED'].includes(subsidyForm.status);
+    if (needsRef && !subsidyForm.applicationRef.trim()) return setMessage('Application reference number is required once the subsidy is applied.');
+    const expected = Number(subsidyForm.amountExpected);
+    const received = Number(subsidyForm.amountReceived);
+    if (expected < 0) return setMessage('Expected subsidy amount cannot be negative.');
+    if (received < 0) return setMessage('Received subsidy amount cannot be negative.');
+    if (received > expected && expected > 0) return setMessage('Amount received cannot exceed the expected subsidy amount.');
     setBusy(true);
     setMessage('');
     try {
       await api.put(`/projects/${selectedProject.id}/subsidy`, {
         status: subsidyForm.status,
-        applicationRef: subsidyForm.applicationRef,
-        amountExpected: Number(subsidyForm.amountExpected),
-        amountReceived: Number(subsidyForm.amountReceived),
+        applicationRef: subsidyForm.applicationRef.trim(),
+        amountExpected: expected,
+        amountReceived: received,
         remarks: subsidyForm.remarks,
       });
       setSubsidyModalOpen(false);

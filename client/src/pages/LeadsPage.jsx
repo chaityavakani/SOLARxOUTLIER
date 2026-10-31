@@ -14,6 +14,7 @@ import {
   Zap,
 } from 'lucide-react';
 import { api, errorText } from '../shared/api.js';
+import { detectGibberish } from '../shared/gibberish.js';
 import { money } from '../shared/formatters.js';
 import StatusBadge from '../components/StatusBadge.jsx';
 import Modal from '../components/Modal.jsx';
@@ -32,6 +33,8 @@ export default function LeadsPage({ onNavigate }) {
   const [scheduleModalOpen, setScheduleModalOpen] = useState(false);
   const [technicians, setTechnicians] = useState([]);
 
+  const LEAD_LETTERS_FILTER = /[^A-Za-zऀ-ॿ\s.''-]/g;
+
   // Forms state
   const [newLeadForm, setNewLeadForm] = useState({
     name: '',
@@ -44,6 +47,11 @@ export default function LeadsPage({ onNavigate }) {
     wantsSubsidy: true,
     source: 'PHONE_CALL',
   });
+  const [leadFieldErrors, setLeadFieldErrors] = useState({});
+
+  function setLeadFieldError(field, msg) {
+    setLeadFieldErrors((prev) => msg ? { ...prev, [field]: msg } : (({ [field]: _, ...rest }) => rest)(prev));
+  }
 
   const [qualifyForm, setQualifyForm] = useState({
     roofAreaSqft: 400,
@@ -106,8 +114,22 @@ export default function LeadsPage({ onNavigate }) {
 
   async function handleCreateLead(e) {
     e.preventDefault();
-    setBusy(true);
     setMessage('');
+    const LETTERS_ONLY = /^[A-Za-zऀ-ॿ\s.''-]{2,100}$/;
+    const name = newLeadForm.name.trim();
+    if (!name || name.length < 2) return setMessage('Full name must be at least 2 characters.');
+    if (!LETTERS_ONLY.test(name)) return setMessage('Name can only contain letters — no numbers or special characters.');
+    const nameGibberish = detectGibberish(name, 'Name');
+    if (nameGibberish) return setMessage(nameGibberish);
+    if (!newLeadForm.phone.trim()) return setMessage('Phone number is required.');
+    if (!/^[0-9]{10}$/.test(newLeadForm.phone.trim())) return setMessage('Enter a valid 10-digit phone number.');
+    if (newLeadForm.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newLeadForm.email.trim())) return setMessage('Enter a valid email address.');
+    const city = newLeadForm.city.trim();
+    if (!city) return setMessage('City is required.');
+    if (!LETTERS_ONLY.test(city)) return setMessage('City name can only contain letters — no numbers or symbols.');
+    const cityGibberish = detectGibberish(city, 'City');
+    if (cityGibberish) return setMessage(cityGibberish);
+    setBusy(true);
     try {
       await api.post('/public/enquiries', {
         ...newLeadForm,
@@ -137,6 +159,16 @@ export default function LeadsPage({ onNavigate }) {
   async function handleQualifySubmit(e) {
     e.preventDefault();
     if (!selectedLead) return;
+    setMessage('');
+    const area = Number(qualifyForm.roofAreaSqft);
+    const bill = Number(qualifyForm.monthlyBillInr);
+    const load = Number(qualifyForm.sanctionedLoadKw);
+    if (!area || area < 50) return setMessage('Roof area must be at least 50 sq ft.');
+    if (area > 50000) return setMessage('Roof area seems too large — please verify.');
+    if (!bill || bill < 100) return setMessage('Monthly bill must be at least ₹100.');
+    if (bill > 500000) return setMessage('Monthly bill seems too high — please verify.');
+    if (!load || load < 0.5) return setMessage('Sanctioned load must be at least 0.5 kW.');
+    if (load > 1000) return setMessage('Sanctioned load seems too high — please verify.');
     setBusy(true);
     setMessage('');
     try {
@@ -180,6 +212,10 @@ export default function LeadsPage({ onNavigate }) {
   async function handleScheduleSubmit(e) {
     e.preventDefault();
     if (!selectedLead) return;
+    setMessage('');
+    if (!scheduleForm.technicianId) return setMessage('Please select a survey technician.');
+    if (!scheduleForm.scheduledAt) return setMessage('Please pick a date and time.');
+    if (new Date(scheduleForm.scheduledAt) <= new Date()) return setMessage('Scheduled date must be in the future.');
     setBusy(true);
     setMessage('');
     try {
@@ -444,7 +480,7 @@ export default function LeadsPage({ onNavigate }) {
       {/* New Enquiry Modal */}
       <Modal
         isOpen={newLeadModalOpen}
-        onClose={() => setNewLeadModalOpen(false)}
+        onClose={() => { setNewLeadModalOpen(false); setLeadFieldErrors({}); }}
         title="Capture New Solar Enquiry"
         subtitle="Record web inquiries, phone calls, or WhatsApp leads directly into the system."
       >
@@ -455,9 +491,17 @@ export default function LeadsPage({ onNavigate }) {
               type="text"
               required
               value={newLeadForm.name}
-              onChange={(e) => setNewLeadForm({ ...newLeadForm, name: e.target.value })}
+              onChange={(e) => {
+                const raw = e.target.value;
+                const hasInvalid = LEAD_LETTERS_FILTER.test(raw);
+                const v = raw.replace(LEAD_LETTERS_FILTER, '');
+                setNewLeadForm({ ...newLeadForm, name: v });
+                if (hasInvalid) setLeadFieldError('name', 'Name can only contain letters — no numbers or special characters.');
+                else setLeadFieldError('name', detectGibberish(v, 'Name'));
+              }}
               placeholder="e.g. Ramesh Patel"
             />
+            {leadFieldErrors.name && <span className="field-error">{leadFieldErrors.name}</span>}
           </label>
 
           <div className="form-row">
@@ -467,18 +511,31 @@ export default function LeadsPage({ onNavigate }) {
                 type="tel"
                 required
                 value={newLeadForm.phone}
-                onChange={(e) => setNewLeadForm({ ...newLeadForm, phone: e.target.value })}
+                onChange={(e) => {
+                  const v = e.target.value.replace(/\D/g, '').slice(0, 10);
+                  setNewLeadForm({ ...newLeadForm, phone: v });
+                  if (e.target.value !== v && e.target.value.length > 0) setLeadFieldError('phone', 'Phone number must contain digits only.');
+                  else if (v.length > 0 && v.length < 10) setLeadFieldError('phone', `Enter a 10-digit number (${v.length}/10 so far).`);
+                  else setLeadFieldError('phone', null);
+                }}
                 placeholder="10-digit mobile number"
               />
+              {leadFieldErrors.phone && <span className="field-error">{leadFieldErrors.phone}</span>}
             </label>
             <label>
               Email Address
               <input
                 type="email"
                 value={newLeadForm.email}
-                onChange={(e) => setNewLeadForm({ ...newLeadForm, email: e.target.value })}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setNewLeadForm({ ...newLeadForm, email: v });
+                  if (v.length > 5 && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) setLeadFieldError('email', 'Enter a valid email address.');
+                  else setLeadFieldError('email', null);
+                }}
                 placeholder="optional"
               />
+              {leadFieldErrors.email && <span className="field-error">{leadFieldErrors.email}</span>}
             </label>
           </div>
 
@@ -489,9 +546,17 @@ export default function LeadsPage({ onNavigate }) {
                 type="text"
                 required
                 value={newLeadForm.city}
-                onChange={(e) => setNewLeadForm({ ...newLeadForm, city: e.target.value })}
+                onChange={(e) => {
+                  const raw = e.target.value;
+                  const hasInvalid = LEAD_LETTERS_FILTER.test(raw);
+                  const v = raw.replace(LEAD_LETTERS_FILTER, '');
+                  setNewLeadForm({ ...newLeadForm, city: v });
+                  if (hasInvalid) setLeadFieldError('city', 'City name can only contain letters — no numbers or symbols.');
+                  else setLeadFieldError('city', detectGibberish(v, 'City'));
+                }}
                 placeholder="e.g. Anand / Ahmedabad"
               />
+              {leadFieldErrors.city && <span className="field-error">{leadFieldErrors.city}</span>}
             </label>
             <label>
               Site Address

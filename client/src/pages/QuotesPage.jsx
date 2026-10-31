@@ -75,7 +75,9 @@ export default function QuotesPage({ onNavigate }) {
 
   async function handleCreateQuote(e) {
     e.preventDefault();
-    if (!selectedLeadId || !selectedKitId) return;
+    setMessage('');
+    if (!selectedLeadId) return setMessage('Please select an approved enquiry.');
+    if (!selectedKitId) return setMessage('Please select a system kit template.');
     setBusy(true);
     setMessage('');
     try {

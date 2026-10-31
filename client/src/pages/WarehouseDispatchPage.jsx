@@ -151,9 +151,18 @@ export default function WarehouseDispatchPage({ user, onNavigate }) {
   async function handleDispatchTruckSubmit(e) {
     e.preventDefault();
     if (!selectedDispatch) return;
+    const vehiclePattern = /^[A-Z]{2}[-\s]?\d{1,2}[-\s]?[A-Z]{1,3}[-\s]?\d{4}$/i;
+    if (!truckForm.vehicleNo.trim()) { alert('Vehicle number is required.'); return; }
+    if (!vehiclePattern.test(truckForm.vehicleNo.trim())) { alert('Enter a valid vehicle number (e.g. GJ-01-AB-1234).'); return; }
+    if (!truckForm.driverName.trim() || truckForm.driverName.trim().length < 2) { alert('Driver name must be at least 2 characters.'); return; }
+    if (!/^[0-9]{10}$/.test(truckForm.driverPhone.trim())) { alert('Enter a valid 10-digit driver phone number.'); return; }
     setBusy(true);
     try {
-      await api.post(`/dispatches/${selectedDispatch.id}/dispatch`, truckForm);
+      await api.post(`/dispatches/${selectedDispatch.id}/dispatch`, {
+        vehicleNo: truckForm.vehicleNo.trim().toUpperCase(),
+        driverName: truckForm.driverName.trim(),
+        driverPhone: truckForm.driverPhone.trim(),
+      });
       setDispatchModalOpen(false);
       openDispatch(selectedDispatch.id);
       loadData();
@@ -167,10 +176,14 @@ export default function WarehouseDispatchPage({ user, onNavigate }) {
   async function handleDeliverySubmit(e) {
     e.preventDefault();
     if (!selectedDispatch) return;
+    if (!deliveryForm.receivedByName.trim() || deliveryForm.receivedByName.trim().length < 2) {
+      alert('Please enter the name of the person who received the delivery (at least 2 characters).');
+      return;
+    }
     setBusy(true);
     try {
       await api.post(`/dispatches/${selectedDispatch.id}/deliver`, {
-        receivedByName: deliveryForm.receivedByName || 'Homeowner',
+        receivedByName: deliveryForm.receivedByName.trim(),
       });
       setDeliveryModalOpen(false);
       openDispatch(selectedDispatch.id);
@@ -185,9 +198,17 @@ export default function WarehouseDispatchPage({ user, onNavigate }) {
 
   async function handleInwardStock(e) {
     e.preventDefault();
-    if (selectedProduct?.isSerialized && autoSerials.length !== Number(purchaseForm.quantity)) {
-      setMessage('Serial numbers are still generating. Please wait a moment and try again.');
-      return;
+    setMessage('');
+    if (!purchaseForm.productId) return setMessage('Please select a product.');
+    if (!purchaseForm.supplierName.trim() || purchaseForm.supplierName.trim().length < 2) return setMessage('Supplier name must be at least 2 characters.');
+    const qty = Number(purchaseForm.quantity);
+    if (!qty || qty < 1 || !Number.isInteger(qty)) return setMessage('Quantity must be a whole number of at least 1.');
+    if (qty > 10000) return setMessage('Quantity seems too high — please verify.');
+    const cost = Number(purchaseForm.unitCost);
+    if (isNaN(cost) || cost < 0) return setMessage('Unit cost must be 0 or more.');
+    if (cost > 10000000) return setMessage('Unit cost seems too high — please verify.');
+    if (selectedProduct?.isSerialized && autoSerials.length !== qty) {
+      return setMessage('Serial numbers are still generating. Please wait a moment and try again.');
     }
     setBusy(true);
     setMessage('');
