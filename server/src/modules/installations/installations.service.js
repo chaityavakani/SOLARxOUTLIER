@@ -27,7 +27,7 @@ export async function listInstallationJobs(user) {
       });
     }
   }
-  const rows = await prisma.installationJob.findMany({ where: user.role === 'INSTALLATION_TECHNICIAN' ? { crew: { some: { technicianId: user.id } } } : undefined, include, orderBy: { scheduledDate: 'asc' } });
+  const rows = await prisma.installationJob.findMany({ where: user.role === 'INSTALLATION_TECHNICIAN' ? { crew: { some: { technicianId: user.id } } } : undefined, include, orderBy: { createdAt: 'desc' } });
   return rows;
 }
 

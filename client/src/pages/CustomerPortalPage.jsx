@@ -6,6 +6,7 @@ import { api, errorText } from '../shared/api.js';
 import { money } from '../shared/formatters.js';
 import StatusBadge from '../components/StatusBadge.jsx';
 import Modal from '../components/Modal.jsx';
+import RazorpayCheckout from '../components/RazorpayCheckout.jsx';
 
 const EMPTY_PAY = { amount: '', type: 'ADVANCE', mode: 'UPI', reference: '', proofNote: '' };
 
@@ -26,6 +27,11 @@ export default function CustomerPortalPage({ user, onNavigate }) {
   const [payQuoteTotal, setPayQuoteTotal] = useState(0);
   const [payForm, setPayForm] = useState(EMPTY_PAY);
   const [payError, setPayError] = useState('');
+
+  // Razorpay checkout
+  const [rzpOpen, setRzpOpen] = useState(false);
+  const [rzpProjectId, setRzpProjectId] = useState(null);
+  const [rzpQuoteTotal, setRzpQuoteTotal] = useState(0);
 
   // Ticket modal
   const [ticketModalOpen, setTicketModalOpen] = useState(false);
@@ -120,6 +126,12 @@ export default function CustomerPortalPage({ user, onNavigate }) {
       loadPortalData();
     } catch (err) { setPayError(errorText(err)); }
     finally { setBusy(false); }
+  }
+
+  function openRazorpay(projectId, quoteTotal) {
+    setRzpProjectId(projectId);
+    setRzpQuoteTotal(quoteTotal);
+    setRzpOpen(true);
   }
 
   async function handleCreateTicketSubmit(e) {
@@ -239,13 +251,22 @@ export default function CustomerPortalPage({ user, onNavigate }) {
                           </span>
                           <p className="text-xs text-blue-600 mt-0.5">Project: {project.code}</p>
                         </div>
-                        <button
-                          className="button primary small-button"
-                          style={{ background: '#1d4ed8' }}
-                          onClick={() => openPayModal(project.id, quoteTotal)}
-                        >
-                          <IndianRupee size={14} /> Make a Payment
-                        </button>
+                        <div className="flex gap-2 flex-wrap">
+                          <button
+                            className="button primary small-button"
+                            style={{ background: '#072654', color: '#fff', display:'flex', alignItems:'center', gap:5 }}
+                            onClick={() => openRazorpay(project.id, quoteTotal)}
+                          >
+                            <span style={{background:'#fff',color:'#072654',borderRadius:3,padding:'0 4px',fontWeight:900,fontSize:11,letterSpacing:'-0.5px'}}>R⚡</span>
+                            Pay via Razorpay
+                          </button>
+                          <button
+                            className="button outline small-button"
+                            onClick={() => openPayModal(project.id, quoteTotal)}
+                          >
+                            <IndianRupee size={14} /> Manual Entry
+                          </button>
+                        </div>
                       </div>
 
                       {/* Finance summary tiles */}
@@ -347,6 +368,19 @@ export default function CustomerPortalPage({ user, onNavigate }) {
         )}
       </div>
 
+      {/* ─── Real Razorpay Checkout ─── */}
+      {rzpOpen && (
+        <RazorpayCheckout
+          projectId={rzpProjectId}
+          quoteTotal={rzpQuoteTotal}
+          customerName={user?.name}
+          customerEmail={user?.email}
+          customerPhone={user?.phone}
+          onSuccess={() => { loadPortalData(); }}
+          onClose={() => setRzpOpen(false)}
+        />
+      )}
+
       {/* Payment Submission Modal */}
       <Modal
         isOpen={payModalOpen}
@@ -385,6 +419,7 @@ export default function CustomerPortalPage({ user, onNavigate }) {
                 <option value="CASH">Cash</option>
                 <option value="CHEQUE">Cheque</option>
                 <option value="CARD">Card</option>
+                <option value="RAZORPAY">Razorpay</option>
               </select>
             </label>
           </div>

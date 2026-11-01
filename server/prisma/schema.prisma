@@ -225,6 +225,7 @@ enum PaymentMode {
   CASH
   CHEQUE
   CARD
+  RAZORPAY
 }
 
 enum ExpenseCategory {

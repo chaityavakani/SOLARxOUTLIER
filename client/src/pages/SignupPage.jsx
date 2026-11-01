@@ -24,6 +24,7 @@ export default function SignupPage({ onSuccess, onBack, onLogin }) {
   const [error, setError] = useState('');
   const [fieldErrors, setFieldErrors] = useState({});
   const [busy, setBusy] = useState(false);
+  const [pinLookup, setPinLookup] = useState('idle'); // idle | loading | found | error
 
   function set(field) {
     return (e) => setForm((prev) => ({ ...prev, [field]: e.target.value }));
@@ -73,6 +74,35 @@ export default function SignupPage({ onSuccess, onBack, onLogin }) {
       setFieldError('state', 'State name can only contain letters — no numbers or symbols.');
     } else {
       setFieldError('state', detectGibberish(v, 'State'));
+    }
+  }
+
+  async function handlePincodeChange(e) {
+    const v = e.target.value.replace(/\D/g, '').slice(0, 6);
+    setForm((p) => ({ ...p, pincode: v }));
+    setFieldErrors((prev) => { const { pincode: _, ...rest } = prev; return rest; });
+    if (v.length < 6) { setPinLookup('idle'); return; }
+    setPinLookup('loading');
+    try {
+      const res = await fetch(`https://api.postalpincode.in/pincode/${v}`);
+      const json = await res.json();
+      if (json?.[0]?.Status === 'Success' && json[0].PostOffice?.length) {
+        const po = json[0].PostOffice[0];
+        const city = po.Division || po.District || po.Block || '';
+        const state = po.State || '';
+        setForm((p) => ({
+          ...p,
+          city: city,
+          state: state,
+        }));
+        setFieldErrors((prev) => { const { city: _c, state: _s, ...rest } = prev; return rest; });
+        setPinLookup('found');
+      } else {
+        setPinLookup('error');
+        setFieldErrors((prev) => ({ ...prev, pincode: 'PIN code not found. Please enter city and state manually.' }));
+      }
+    } catch {
+      setPinLookup('error');
     }
   }
 
@@ -246,6 +276,31 @@ export default function SignupPage({ onSuccess, onBack, onLogin }) {
               {fieldErrors.addressLine && <span className="field-error">{fieldErrors.addressLine}</span>}
             </label>
 
+            <label>
+              PIN code *
+              <div style={{ position: 'relative' }}>
+                <input
+                  placeholder="Enter 6-digit PIN — city & state auto-fill"
+                  value={form.pincode}
+                  onChange={handlePincodeChange}
+                  maxLength={6}
+                  style={{ paddingRight: 36 }}
+                />
+                {pinLookup === 'loading' && (
+                  <span style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', width: 16, height: 16, border: '2px solid #e5e7eb', borderTopColor: '#3395FF', borderRadius: '50%', display: 'inline-block', animation: 'pinSpin .7s linear infinite' }} />
+                )}
+                {pinLookup === 'found' && (
+                  <span style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', color: '#16a34a', fontSize: 16, fontWeight: 700 }}>✓</span>
+                )}
+              </div>
+              {fieldErrors.pincode && <span className="field-error">{fieldErrors.pincode}</span>}
+              {pinLookup === 'found' && (
+                <span style={{ fontSize: 11, color: '#16a34a', marginTop: 3, display: 'block' }}>
+                  ✓ City &amp; state auto-filled from PIN code
+                </span>
+              )}
+            </label>
+
             <div className="form-row">
               <label>
                 City *
@@ -268,15 +323,7 @@ export default function SignupPage({ onSuccess, onBack, onLogin }) {
                 {fieldErrors.state && <span className="field-error">{fieldErrors.state}</span>}
               </label>
             </div>
-
-            <label>
-              PIN code
-              <input
-                placeholder="6-digit PIN"
-                value={form.pincode}
-                onChange={(e) => setForm((p) => ({ ...p, pincode: e.target.value.replace(/\D/g, '').slice(0, 6) }))}
-              />
-            </label>
+            <style>{`@keyframes pinSpin { to { transform: translateY(-50%) rotate(360deg) } }`}</style>
 
             {/* Solar Preferences */}
             <p className="form-section-label">Solar Preferences</p>

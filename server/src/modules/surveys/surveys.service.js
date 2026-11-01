@@ -72,7 +72,7 @@ export async function listSurveys({ user, status, technicianId, page, pageSize, 
     prisma.survey.findMany({
       where,
       include,
-      orderBy: [{ scheduledAt: 'asc' }],
+      orderBy: [{ createdAt: 'desc' }],
       skip,
       take,
     }),
