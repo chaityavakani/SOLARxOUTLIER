@@ -106,7 +106,8 @@ export default function SignupPage({ onSuccess, onBack, onLogin }) {
     } else if (!NAME_RE.test(name)) {
       errs.name = 'Name can only contain letters and spaces — no numbers or special characters.';
     } else {
-      errs.name = detectGibberish(name, 'Name');
+      const g = detectGibberish(name, 'Name');
+      if (g) errs.name = g;
     }
 
     if (!form.email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {
@@ -124,7 +125,8 @@ export default function SignupPage({ onSuccess, onBack, onLogin }) {
     } else if (!PLACE_RE.test(city)) {
       errs.city = 'City name can only contain letters — no numbers or symbols.';
     } else {
-      errs.city = detectGibberish(city, 'City');
+      const g = detectGibberish(city, 'City');
+      if (g) errs.city = g;
     }
 
     const state = form.state.trim();
@@ -133,7 +135,8 @@ export default function SignupPage({ onSuccess, onBack, onLogin }) {
     } else if (!PLACE_RE.test(state)) {
       errs.state = 'State name can only contain letters — no numbers or symbols.';
     } else {
-      errs.state = detectGibberish(state, 'State');
+      const g = detectGibberish(state, 'State');
+      if (g) errs.state = g;
     }
 
     if (form.password.length < 8) errs.password = 'Password must be at least 8 characters.';
@@ -165,8 +168,9 @@ export default function SignupPage({ onSuccess, onBack, onLogin }) {
         addressLine: [form.addressLine, form.pincode].filter(Boolean).join(', ') || undefined,
         city: form.city.trim(),
       };
-      const { data } = await api.post('/auth/register', payload);
-      onSuccess(data.data.user);
+      await api.post('/auth/register', payload);
+      const meRes = await api.get('/auth/me');
+      onSuccess(meRes.data.data.user);
     } catch (err) {
       setError(errorText(err));
     } finally {

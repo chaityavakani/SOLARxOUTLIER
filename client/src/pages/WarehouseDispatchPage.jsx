@@ -14,14 +14,23 @@ import {
   Scan,
   Navigation,
   MapPin,
+  Tag,
+  Pencil,
 } from 'lucide-react';
 import { api, errorText } from '../shared/api.js';
 import { money } from '../shared/formatters.js';
 import StatusBadge from '../components/StatusBadge.jsx';
 import Modal from '../components/Modal.jsx';
 
+const EMPTY_PRODUCT = {
+  sku: '', name: '', category: 'PANEL', brand: '', unit: 'PCS',
+  isSerialized: false, warrantyMonths: '12',
+  costPrice: '', sellPrice: '', taxPercent: '18', reorderLevel: '5',
+};
+
 export default function WarehouseDispatchPage({ user, onNavigate }) {
-  const [activeTab, setActiveTab] = useState('DISPATCHES'); // 'DISPATCHES', 'STOCK'
+  const [activeTab, setActiveTab] = useState('DISPATCHES'); // 'DISPATCHES', 'STOCK', 'PRODUCTS'
+  const canManageProducts = ['SUPER_ADMIN', 'DIRECTOR'].includes(user?.role);
   const [dispatches, setDispatches] = useState([]);
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -55,6 +64,12 @@ export default function WarehouseDispatchPage({ user, onNavigate }) {
   const [autoSerials, setAutoSerials] = useState([]);
   const [serialsLoading, setSerialsLoading] = useState(false);
 
+  // Product catalog management
+  const [productModalOpen, setProductModalOpen] = useState(false);
+  const [editingProduct, setEditingProduct] = useState(null);
+  const [productForm, setProductForm] = useState(EMPTY_PRODUCT);
+  const [productError, setProductError] = useState('');
+
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
@@ -74,6 +89,7 @@ export default function WarehouseDispatchPage({ user, onNavigate }) {
         const res = await api.get('/inventory/products');
         setProducts(res.data.data || []);
       }
+      // Always reload products for PRODUCTS tab
     } catch (err) {
       setMessage(errorText(err));
     } finally {
@@ -253,6 +269,59 @@ export default function WarehouseDispatchPage({ user, onNavigate }) {
     }
   }
 
+  function openAddProduct() {
+    setEditingProduct(null);
+    setProductForm(EMPTY_PRODUCT);
+    setProductError('');
+    setProductModalOpen(true);
+  }
+
+  function openEditProduct(p) {
+    setEditingProduct(p);
+    setProductForm({
+      sku: p.sku, name: p.name, category: p.category, brand: p.brand || '',
+      unit: p.unit, isSerialized: p.isSerialized,
+      warrantyMonths: String(p.warrantyMonths),
+      costPrice: String(p.costPrice), sellPrice: String(p.sellPrice),
+      taxPercent: String(p.taxPercent), reorderLevel: String(p.reorderLevel),
+    });
+    setProductError('');
+    setProductModalOpen(true);
+  }
+
+  async function handleSaveProduct(e) {
+    e.preventDefault();
+    if (!productForm.sellPrice || Number(productForm.sellPrice) <= 0) {
+      setProductError('Selling price is required and must be greater than 0.');
+      return;
+    }
+    setBusy(true);
+    setProductError('');
+    try {
+      const payload = {
+        ...productForm,
+        isSerialized: Boolean(productForm.isSerialized),
+        warrantyMonths: Number(productForm.warrantyMonths),
+        costPrice: Number(productForm.costPrice),
+        sellPrice: Number(productForm.sellPrice),
+        taxPercent: Number(productForm.taxPercent),
+        reorderLevel: Number(productForm.reorderLevel),
+      };
+      if (editingProduct) {
+        await api.put(`/inventory/products/${editingProduct.id}`, payload);
+      } else {
+        await api.post('/inventory/products', payload);
+      }
+      setProductModalOpen(false);
+      const res = await api.get('/inventory/products');
+      setProducts(res.data.data || []);
+    } catch (err) {
+      setProductError(errorText(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <div className="warehouse-page">
       {/* Top Banner */}
@@ -280,6 +349,12 @@ export default function WarehouseDispatchPage({ user, onNavigate }) {
           onClick={() => setActiveTab('STOCK')}
         >
           Warehouse Stock & Inward Receiving
+        </button>
+        <button
+          className={`tab-btn ${activeTab === 'PRODUCTS' ? 'active' : ''}`}
+          onClick={() => setActiveTab('PRODUCTS')}
+        >
+          <Tag size={13} /> Product Catalog & Pricing
         </button>
       </div>
 
@@ -507,6 +582,165 @@ export default function WarehouseDispatchPage({ user, onNavigate }) {
           </div>
         </div>
       )}
+
+      {/* Tab 3: Product Catalog & Pricing */}
+      {activeTab === 'PRODUCTS' && (
+        <div className="panel p-5">
+          <div className="panel-head mb-4 flex justify-between items-center">
+            <div>
+              <h2>Product Catalog & Selling Prices</h2>
+              <p>These selling prices are used automatically when generating quotations.</p>
+            </div>
+            {canManageProducts && (
+              <button className="button primary small-button" onClick={openAddProduct}>
+                <Plus size={14} /> Add Product
+              </button>
+            )}
+          </div>
+
+          <div className="table-wrap">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>SKU</th>
+                  <th>Product Name</th>
+                  <th>Category</th>
+                  <th>Unit</th>
+                  <th>Tax %</th>
+                  <th>Cost Price</th>
+                  <th>Selling Price</th>
+                  {canManageProducts && <th>Action</th>}
+                </tr>
+              </thead>
+              <tbody>
+                {products.map((item) => (
+                  <tr key={item.id}>
+                    <td><strong>{item.sku}</strong></td>
+                    <td>
+                      <div>{item.name}</div>
+                      {item.brand && <small className="muted">{item.brand}</small>}
+                    </td>
+                    <td><small className="muted">{item.category}</small></td>
+                    <td>{item.unit}</td>
+                    <td>{Number(item.taxPercent)}%</td>
+                    <td className="text-slate-500">{money(item.costPrice)}</td>
+                    <td>
+                      <strong className="text-emerald-700">{money(item.sellPrice)}</strong>
+                    </td>
+                    {canManageProducts && (
+                      <td>
+                        <button
+                          className="text-xs px-2 py-1 rounded border border-blue-300 text-blue-700 hover:bg-blue-50 flex items-center gap-1"
+                          onClick={() => openEditProduct(item)}
+                        >
+                          <Pencil size={11} /> Edit Price
+                        </button>
+                      </td>
+                    )}
+                  </tr>
+                ))}
+                {products.length === 0 && (
+                  <tr><td colSpan={canManageProducts ? 8 : 7} className="text-center text-slate-400 py-6">No products in catalog yet.</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Product Add/Edit Modal */}
+      <Modal
+        isOpen={productModalOpen}
+        onClose={() => setProductModalOpen(false)}
+        title={editingProduct ? `Edit Product: ${editingProduct.name}` : 'Add New Product'}
+        subtitle="Selling price is used automatically in quotation generation."
+      >
+        <form onSubmit={handleSaveProduct} className="survey-form">
+          {productError && <p className="form-message error mb-3">{productError}</p>}
+
+          <div className="grid grid-cols-2 gap-3">
+            <label>
+              SKU *
+              <input
+                required
+                type="text"
+                placeholder="e.g. SOL-PANEL-400W"
+                value={productForm.sku}
+                disabled={!!editingProduct}
+                onChange={(e) => setProductForm({ ...productForm, sku: e.target.value })}
+              />
+            </label>
+            <label>
+              Category *
+              <select value={productForm.category} onChange={(e) => setProductForm({ ...productForm, category: e.target.value })}>
+                {['PANEL','INVERTER','BATTERY','CHARGE_CONTROLLER','MOUNTING_STRUCTURE','DC_BOX','AC_BOX','CABLE','EARTHING','CONNECTOR','ACCESSORY','SERVICE'].map((c) => (
+                  <option key={c} value={c}>{c.replace(/_/g, ' ')}</option>
+                ))}
+              </select>
+            </label>
+          </div>
+
+          <label>
+            Product Name *
+            <input required type="text" placeholder="e.g. Adani 400W Mono PERC Solar Panel" value={productForm.name} onChange={(e) => setProductForm({ ...productForm, name: e.target.value })} />
+          </label>
+
+          <div className="grid grid-cols-2 gap-3">
+            <label>
+              Brand
+              <input type="text" placeholder="e.g. Adani Solar" value={productForm.brand} onChange={(e) => setProductForm({ ...productForm, brand: e.target.value })} />
+            </label>
+            <label>
+              Unit
+              <select value={productForm.unit} onChange={(e) => setProductForm({ ...productForm, unit: e.target.value })}>
+                <option value="PCS">PCS (Pieces)</option>
+                <option value="METER">METER</option>
+                <option value="SET">SET</option>
+                <option value="HOUR">HOUR</option>
+              </select>
+            </label>
+          </div>
+
+          <div className="grid grid-cols-3 gap-3">
+            <label>
+              Cost Price (₹) *
+              <input required type="number" min="0" step="0.01" placeholder="0.00" value={productForm.costPrice} onChange={(e) => setProductForm({ ...productForm, costPrice: e.target.value })} />
+            </label>
+            <label>
+              <span className="font-bold text-emerald-700">Selling Price (₹) *</span>
+              <input required type="number" min="0.01" step="0.01" placeholder="0.00" value={productForm.sellPrice} onChange={(e) => setProductForm({ ...productForm, sellPrice: e.target.value })} />
+              <small className="text-emerald-600">Used in quotes</small>
+            </label>
+            <label>
+              Tax %
+              <input type="number" min="0" max="30" step="0.1" value={productForm.taxPercent} onChange={(e) => setProductForm({ ...productForm, taxPercent: e.target.value })} />
+            </label>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <label>
+              Warranty (months)
+              <input type="number" min="0" value={productForm.warrantyMonths} onChange={(e) => setProductForm({ ...productForm, warrantyMonths: e.target.value })} />
+            </label>
+            <label>
+              Reorder Level
+              <input type="number" min="0" value={productForm.reorderLevel} onChange={(e) => setProductForm({ ...productForm, reorderLevel: e.target.value })} />
+            </label>
+          </div>
+
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" checked={productForm.isSerialized} onChange={(e) => setProductForm({ ...productForm, isSerialized: e.target.checked })} />
+            <span className="text-sm">Serialized (tracked by individual unit serial number)</span>
+          </label>
+
+          <div className="modal-actions mt-4 flex justify-end gap-2">
+            <button type="button" className="button outline small-button" onClick={() => setProductModalOpen(false)}>Cancel</button>
+            <button type="submit" className="button primary small-button" disabled={busy}>
+              {busy ? 'Saving…' : editingProduct ? 'Save Changes' : 'Add Product'}
+            </button>
+          </div>
+        </form>
+      </Modal>
 
       {/* Dispatch Scanning & Packing Workspace Modal */}
       {selectedDispatch && (

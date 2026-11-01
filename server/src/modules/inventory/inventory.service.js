@@ -2,6 +2,18 @@ import { prisma } from '../../core/prisma.js';
 import { badRequest, conflict, notFound } from '../../core/AppError.js';
 import { nextCode } from '../../core/codes.js';
 
+export async function createProduct(data) {
+  const existing = await prisma.product.findUnique({ where: { sku: data.sku } });
+  if (existing) throw conflict('A product with this SKU already exists.', 'SKU_TAKEN');
+  return prisma.product.create({ data });
+}
+
+export async function updateProduct(id, data) {
+  const product = await prisma.product.findUnique({ where: { id } });
+  if (!product) throw notFound('Product not found.');
+  return prisma.product.update({ where: { id }, data });
+}
+
 export async function listProducts(q) {
   return prisma.product.findMany({
     where: q

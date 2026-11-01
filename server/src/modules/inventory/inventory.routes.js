@@ -5,7 +5,7 @@ import { ok, created } from '../../core/response.js';
 import { requireAuth } from '../../middlewares/requireAuth.js';
 import { requireRole } from '../../middlewares/requireRole.js';
 import { validate } from '../../middlewares/validate.js';
-import { createPurchase, generateNextSerials, listAvailableSerialsByProducts, listProducts, listSerials, listWarranties } from './inventory.service.js';
+import { createProduct, updateProduct, createPurchase, generateNextSerials, listAvailableSerialsByProducts, listProducts, listSerials, listWarranties } from './inventory.service.js';
 
 const staffRoles = ['WAREHOUSE_MANAGER', 'DIRECTOR', 'SUPER_ADMIN', 'SUPPORT_EXECUTIVE', 'SALES_EXECUTIVE', 'INSTALLATION_TECHNICIAN'];
 
@@ -38,6 +38,34 @@ inventoryRouter.get(
     const customerId = req.user.role === 'CUSTOMER' ? req.user.customerId : (req.query.customerId || null);
     ok(res, await listWarranties(req.query.q, customerId));
   })
+);
+
+const productBody = z.object({
+  sku: z.string().trim().min(1, 'SKU is required.'),
+  name: z.string().trim().min(2, 'Product name is required.'),
+  category: z.enum(['PANEL','INVERTER','BATTERY','CHARGE_CONTROLLER','MOUNTING_STRUCTURE','DC_BOX','AC_BOX','CABLE','EARTHING','CONNECTOR','ACCESSORY','SERVICE']),
+  brand: z.string().trim().optional(),
+  unit: z.enum(['PCS','METER','SET','HOUR']).default('PCS'),
+  isSerialized: z.boolean().default(false),
+  warrantyMonths: z.coerce.number().int().min(0).default(12),
+  costPrice: z.coerce.number().min(0, 'Cost price required.'),
+  sellPrice: z.coerce.number().min(0, 'Sell price required.'),
+  taxPercent: z.coerce.number().min(0).max(30).default(18),
+  reorderLevel: z.coerce.number().int().min(0).default(5),
+});
+
+inventoryRouter.post(
+  '/products',
+  requireRole('SUPER_ADMIN', 'DIRECTOR'),
+  validate({ body: productBody }),
+  asyncHandler(async (req, res) => created(res, await createProduct(req.body)))
+);
+
+inventoryRouter.put(
+  '/products/:id',
+  requireRole('SUPER_ADMIN', 'DIRECTOR'),
+  validate({ body: productBody.partial().extend({ sku: z.string().trim().min(1).optional() }) }),
+  asyncHandler(async (req, res) => ok(res, await updateProduct(req.params.id, req.body)))
 );
 
 inventoryRouter.post(
