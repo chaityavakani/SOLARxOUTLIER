@@ -25,7 +25,7 @@ import Modal from '../components/Modal.jsx';
 const EMPTY_PRODUCT = {
   sku: '', name: '', category: 'PANEL', brand: '', unit: 'PCS',
   isSerialized: false, warrantyMonths: '12',
-  costPrice: '', sellPrice: '', taxPercent: '18', reorderLevel: '5',
+  costPrice: '', sellPrice: '', taxPercent: '18', reorderLevel: '5', stockQty: '0',
 };
 
 export default function WarehouseDispatchPage({ user, onNavigate }) {
@@ -64,6 +64,10 @@ export default function WarehouseDispatchPage({ user, onNavigate }) {
   const [autoSerials, setAutoSerials] = useState([]);
   const [serialsLoading, setSerialsLoading] = useState(false);
 
+  // Purchase log
+  const [purchases, setPurchases] = useState([]);
+  const [logOpen, setLogOpen] = useState(false);
+
   // Product catalog management
   const [productModalOpen, setProductModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
@@ -86,8 +90,12 @@ export default function WarehouseDispatchPage({ user, onNavigate }) {
         const res = await api.get('/dispatches');
         setDispatches(res.data.data || []);
       } else {
-        const res = await api.get('/inventory/products');
-        setProducts(res.data.data || []);
+        const [prodRes, purRes] = await Promise.all([
+          api.get('/inventory/products'),
+          api.get('/inventory/purchases'),
+        ]);
+        setProducts(prodRes.data.data || []);
+        setPurchases(purRes.data.data || []);
       }
       // Always reload products for PRODUCTS tab
     } catch (err) {
@@ -284,6 +292,7 @@ export default function WarehouseDispatchPage({ user, onNavigate }) {
       warrantyMonths: String(p.warrantyMonths),
       costPrice: String(p.costPrice), sellPrice: String(p.sellPrice),
       taxPercent: String(p.taxPercent), reorderLevel: String(p.reorderLevel),
+      stockQty: String(p.stockQty ?? 0),
     });
     setProductError('');
     setProductModalOpen(true);
@@ -309,6 +318,12 @@ export default function WarehouseDispatchPage({ user, onNavigate }) {
       };
       if (editingProduct) {
         await api.put(`/inventory/products/${editingProduct.id}`, payload);
+        // Also update stock qty for non-serialized products
+        if (!payload.isSerialized) {
+          await api.patch(`/inventory/products/${editingProduct.id}/stock`, {
+            stockQty: Number(productForm.stockQty),
+          });
+        }
       } else {
         await api.post('/inventory/products', payload);
       }
@@ -451,8 +466,14 @@ export default function WarehouseDispatchPage({ user, onNavigate }) {
                     required
                     value={purchaseForm.productId}
                     onChange={(e) => {
-                      setPurchaseForm({ ...purchaseForm, productId: e.target.value });
-                      fetchAutoSerials(e.target.value, purchaseForm.quantity);
+                      const pid = e.target.value;
+                      const prod = products.find((p) => p.id === pid);
+                      setPurchaseForm({
+                        ...purchaseForm,
+                        productId: pid,
+                        unitCost: prod ? String(prod.costPrice) : '',
+                      });
+                      fetchAutoSerials(pid, purchaseForm.quantity);
                     }}
                   >
                     <option value="">Choose product…</option>
@@ -500,6 +521,14 @@ export default function WarehouseDispatchPage({ user, onNavigate }) {
                     value={purchaseForm.unitCost}
                     onChange={(e) => setPurchaseForm({ ...purchaseForm, unitCost: e.target.value })}
                   />
+                  {selectedProduct && (
+                    <small className="text-blue-600">
+                      Last recorded cost: <strong>₹{Number(selectedProduct.costPrice).toLocaleString('en-IN')}</strong>
+                      {purchaseForm.unitCost && Number(purchaseForm.unitCost) !== Number(selectedProduct.costPrice) && (
+                        <span className="text-amber-600 ml-2">⚠ Changed from last cost</span>
+                      )}
+                    </small>
+                  )}
                 </label>
               </div>
 
@@ -532,13 +561,18 @@ export default function WarehouseDispatchPage({ user, onNavigate }) {
             </form>
           </div>
 
-          {/* Current Stock Inventory Table */}
+          {/* Live Inventory Levels */}
           <div className="panel p-5">
-            <div className="panel-head mb-3">
+            <div className="panel-head mb-3 flex justify-between items-center">
               <div>
                 <h2>Live Inventory Levels</h2>
                 <p>Available stock on hand in the central warehouse.</p>
               </div>
+              {canManageProducts && (
+                <button className="button primary small-button" onClick={openAddProduct}>
+                  <Plus size={14} /> Add Product
+                </button>
+              )}
             </div>
 
             <div className="table-wrap">
@@ -548,36 +582,124 @@ export default function WarehouseDispatchPage({ user, onNavigate }) {
                     <th>SKU</th>
                     <th>Product Name</th>
                     <th>Category</th>
+                    <th>Brand</th>
                     <th>Type</th>
                     <th>Current Stock</th>
+                    <th>Reorder At</th>
                     <th>Cost Price</th>
                     <th>Selling Price</th>
+                    <th>Tax %</th>
+                    <th>Warranty</th>
+                    {canManageProducts && <th>Edit</th>}
                   </tr>
                 </thead>
                 <tbody>
                   {products.map((item) => (
-                    <tr key={item.id}>
+                    <tr key={item.id} className={!item.isSerialized && item.stockQty <= item.reorderLevel ? 'bg-red-50' : ''}>
                       <td><strong>{item.sku}</strong></td>
-                      <td>{item.name}</td>
+                      <td><strong>{item.name}</strong></td>
                       <td><small className="muted">{item.category}</small></td>
+                      <td><small className="muted">{item.brand || '—'}</small></td>
                       <td>
                         {item.isSerialized ? (
                           <span className="badge-blue text-xs px-2 py-0.5 rounded">Serialized</span>
                         ) : (
-                          <span className="muted text-xs">Standard Qty</span>
+                          <span className="muted text-xs">Qty-Based</span>
                         )}
                       </td>
                       <td>
-                        <strong className={item.stockQty <= 5 ? 'text-red-700' : 'text-emerald-700'}>
-                          {item.isSerialized ? 'Tracked by Unit' : `${item.stockQty} ${item.unit}`}
+                        <strong className={!item.isSerialized && item.stockQty <= item.reorderLevel ? 'text-red-700' : 'text-emerald-700'}>
+                          {item.isSerialized ? 'Per Unit' : `${item.stockQty} ${item.unit}`}
                         </strong>
+                        {!item.isSerialized && item.stockQty <= item.reorderLevel && (
+                          <span className="ml-1 text-xs text-red-500">⚠ Low</span>
+                        )}
                       </td>
+                      <td><small className="muted">{item.isSerialized ? '—' : `${item.reorderLevel} ${item.unit}`}</small></td>
                       <td>{money(item.costPrice)}</td>
-                      <td>{money(item.sellPrice)}</td>
+                      <td><strong>{money(item.sellPrice)}</strong></td>
+                      <td><small>{item.taxPercent}%</small></td>
+                      <td><small className="muted">{item.warrantyMonths}m</small></td>
+                      {canManageProducts && (
+                        <td>
+                          <button
+                            className="button outline small-button"
+                            style={{ padding: '3px 10px', fontSize: '12px' }}
+                            onClick={() => openEditProduct(item)}
+                          >
+                            <Pencil size={12} /> Edit
+                          </button>
+                        </td>
+                      )}
                     </tr>
                   ))}
                 </tbody>
               </table>
+            </div>
+
+            {/* Collapsible Purchase Log */}
+            <div className="mt-5 border-t pt-4">
+              <button
+                type="button"
+                className="w-full flex items-center justify-between px-4 py-3 rounded-lg bg-slate-50 hover:bg-slate-100 border border-slate-200 transition-colors text-left"
+                onClick={() => setLogOpen((o) => !o)}
+              >
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-bold text-slate-700">📋 Inward Stock Purchase Log</span>
+                  <span className="px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 text-xs font-bold">
+                    {purchases.length} entries
+                  </span>
+                </div>
+                <span className="text-slate-400 text-lg">{logOpen ? '▲' : '▼'}</span>
+              </button>
+
+              {logOpen && (
+                <div className="mt-3">
+                  {purchases.length === 0 ? (
+                    <p className="muted text-sm p-3">No inward stock entries yet.</p>
+                  ) : (
+                    <div className="table-wrap">
+                      <table className="data-table text-xs">
+                        <thead>
+                          <tr>
+                            <th>Purchase #</th>
+                            <th>Date</th>
+                            <th>Supplier</th>
+                            <th>Items Received</th>
+                            <th>Total Value</th>
+                            <th>Recorded By</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {purchases.map((pur) => (
+                            <tr key={pur.id}>
+                              <td><strong className="font-mono">{pur.number}</strong></td>
+                              <td>{new Date(pur.purchasedAt).toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric' })}</td>
+                              <td>{pur.supplier?.name || '—'}</td>
+                              <td>
+                                <div className="space-y-0.5">
+                                  {pur.items.map((line) => (
+                                    <div key={line.id} className="flex gap-2 items-center flex-wrap">
+                                      <span className="font-mono text-slate-400">{line.product?.sku}</span>
+                                      <span className="font-semibold text-slate-800">{line.product?.name}</span>
+                                      <span className="px-1.5 py-0.5 bg-blue-50 text-blue-700 rounded font-bold">
+                                        × {line.quantity} {line.product?.unit}
+                                      </span>
+                                      <span className="text-slate-500">@ ₹{Number(line.unitCost).toLocaleString('en-IN')}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </td>
+                              <td><strong className="text-emerald-700">₹{Number(pur.total).toLocaleString('en-IN')}</strong></td>
+                              <td><span className="muted">{pur.createdBy?.name || '—'}</span></td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -717,7 +839,7 @@ export default function WarehouseDispatchPage({ user, onNavigate }) {
             </label>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-3 gap-3">
             <label>
               Warranty (months)
               <input type="number" min="0" value={productForm.warrantyMonths} onChange={(e) => setProductForm({ ...productForm, warrantyMonths: e.target.value })} />
@@ -726,6 +848,17 @@ export default function WarehouseDispatchPage({ user, onNavigate }) {
               Reorder Level
               <input type="number" min="0" value={productForm.reorderLevel} onChange={(e) => setProductForm({ ...productForm, reorderLevel: e.target.value })} />
             </label>
+            {editingProduct && !productForm.isSerialized && (
+              <label>
+                <span className="font-bold text-blue-700">Current Stock (qty)</span>
+                <input
+                  type="number" min="0"
+                  value={productForm.stockQty}
+                  onChange={(e) => setProductForm({ ...productForm, stockQty: e.target.value })}
+                />
+                <small className="text-blue-600">Direct adjustment</small>
+              </label>
+            )}
           </div>
 
           <label className="flex items-center gap-2 cursor-pointer">

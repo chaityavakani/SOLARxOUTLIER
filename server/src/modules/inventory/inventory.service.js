@@ -14,6 +14,13 @@ export async function updateProduct(id, data) {
   return prisma.product.update({ where: { id }, data });
 }
 
+export async function adjustStock(id, stockQty) {
+  const product = await prisma.product.findUnique({ where: { id } });
+  if (!product) throw notFound('Product not found.');
+  if (product.isSerialized) throw badRequest('Serialized products are tracked per unit — use purchase entry to add stock.', 'SERIALIZED');
+  return prisma.product.update({ where: { id }, data: { stockQty } });
+}
+
 export async function listProducts(q) {
   return prisma.product.findMany({
     where: q
@@ -124,6 +131,19 @@ export async function generateNextSerials(productId, quantity) {
     serials.push(`${prefix}-${seq}`);
   }
   return serials;
+}
+
+export async function listPurchases() {
+  return prisma.purchase.findMany({
+    orderBy: { purchasedAt: 'desc' },
+    include: {
+      supplier: true,
+      createdBy: { select: { id: true, name: true } },
+      items: {
+        include: { product: { select: { id: true, name: true, sku: true, unit: true } } },
+      },
+    },
+  });
 }
 
 export async function createPurchase(data, actor) {

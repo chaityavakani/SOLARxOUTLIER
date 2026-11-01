@@ -5,7 +5,7 @@ import { ok, created } from '../../core/response.js';
 import { requireAuth } from '../../middlewares/requireAuth.js';
 import { requireRole } from '../../middlewares/requireRole.js';
 import { validate } from '../../middlewares/validate.js';
-import { createProduct, updateProduct, createPurchase, generateNextSerials, listAvailableSerialsByProducts, listProducts, listSerials, listWarranties } from './inventory.service.js';
+import { createProduct, updateProduct, adjustStock, listPurchases, createPurchase, generateNextSerials, listAvailableSerialsByProducts, listProducts, listSerials, listWarranties } from './inventory.service.js';
 
 const staffRoles = ['WAREHOUSE_MANAGER', 'DIRECTOR', 'SUPER_ADMIN', 'SUPPORT_EXECUTIVE', 'SALES_EXECUTIVE', 'INSTALLATION_TECHNICIAN'];
 
@@ -66,6 +66,19 @@ inventoryRouter.put(
   requireRole('SUPER_ADMIN', 'DIRECTOR'),
   validate({ body: productBody.partial().extend({ sku: z.string().trim().min(1).optional() }) }),
   asyncHandler(async (req, res) => ok(res, await updateProduct(req.params.id, req.body)))
+);
+
+inventoryRouter.patch(
+  '/products/:id/stock',
+  requireRole('WAREHOUSE_MANAGER', 'DIRECTOR', 'SUPER_ADMIN'),
+  validate({ body: z.object({ stockQty: z.coerce.number().int().min(0) }) }),
+  asyncHandler(async (req, res) => ok(res, await adjustStock(req.params.id, req.body.stockQty)))
+);
+
+inventoryRouter.get(
+  '/purchases',
+  requireRole('WAREHOUSE_MANAGER', 'DIRECTOR', 'SUPER_ADMIN'),
+  asyncHandler(async (_req, res) => ok(res, await listPurchases()))
 );
 
 inventoryRouter.post(
