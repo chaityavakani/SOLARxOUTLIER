@@ -62,6 +62,7 @@ export async function listWarranties(q, customerId) {
   const searchConditions = q
     ? [
         { serialUnit: { serialNumber: { contains: q, mode: 'insensitive' } } },
+        { product: { name: { contains: q, mode: 'insensitive' } } },
         { customer: { name: { contains: q, mode: 'insensitive' } } },
         { customer: { phone: { contains: q, mode: 'insensitive' } } },
         { project: { code: { contains: q, mode: 'insensitive' } } },
@@ -78,6 +79,7 @@ export async function listWarranties(q, customerId) {
     where,
     include: {
       serialUnit: { include: { product: true } },
+      product: true,
       customer: true,
       project: { include: { customer: true } },
     },
@@ -87,12 +89,14 @@ export async function listWarranties(q, customerId) {
   return warranties.map((w) => {
     const isUnderWarranty = new Date(w.startDate) <= now && new Date(w.endDate) >= now && !w.voidReason;
     const daysRemaining = new Date(w.endDate) > now ? Math.ceil((new Date(w.endDate) - now) / (1000 * 60 * 60 * 24)) : 0;
-    const warrantyMonths = w.serialUnit?.product?.warrantyMonths || 0;
+    const prod = w.serialUnit?.product || w.product;
+    const warrantyMonths = prod?.warrantyMonths || 0;
     return {
       ...w,
       isUnderWarranty,
       daysRemaining,
       warrantyMonths,
+      productName: prod?.name || 'Unknown Product',
     };
   });
 }

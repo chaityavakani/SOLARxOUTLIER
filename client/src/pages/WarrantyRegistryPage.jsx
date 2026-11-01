@@ -136,7 +136,7 @@ export default function WarrantyRegistryPage() {
           <div className="empty-state">
             <ShieldCheck size={32} />
             <h3>No warranties found</h3>
-            <p>Serialized equipment units appear here automatically once delivery is completed.</p>
+            <p>Warranty records appear here automatically once a dispatch is marked as delivered.</p>
           </div>
         </div>
       ) : (
@@ -215,16 +215,22 @@ export default function WarrantyRegistryPage() {
                           </tr>
                         </thead>
                         <tbody>
-                          {group.items.map((w) => (
+                          {group.items.map((w) => {
+                            const prod = w.serialUnit?.product || w.product;
+                            return (
                             <tr key={w.id}>
                               <td>
-                                <span style={{fontFamily:'monospace',background:'#fffbeb',color:'#92400e',padding:'2px 8px',borderRadius:4,fontWeight:700,fontSize:12}}>
-                                  {w.serialUnit?.serialNumber}
-                                </span>
+                                {w.serialUnit?.serialNumber ? (
+                                  <span style={{fontFamily:'monospace',background:'#fffbeb',color:'#92400e',padding:'2px 8px',borderRadius:4,fontWeight:700,fontSize:12}}>
+                                    {w.serialUnit.serialNumber}
+                                  </span>
+                                ) : (
+                                  <span style={{fontSize:12,color:'var(--muted)'}}>Non-serialized</span>
+                                )}
                               </td>
                               <td>
-                                <div style={{fontWeight:600}}>{w.serialUnit?.product?.name}</div>
-                                <small className="muted">{w.serialUnit?.product?.category}</small>
+                                <div style={{fontWeight:600}}>{prod?.name || w.productName || '—'}</div>
+                                <small className="muted">{prod?.category}</small>
                               </td>
                               <td style={{fontSize:12,fontWeight:600}}>
                                 {w.warrantyMonths >= 12
@@ -268,7 +274,8 @@ export default function WarrantyRegistryPage() {
                                 </button>
                               </td>
                             </tr>
-                          ))}
+                          );
+                          })}
                         </tbody>
                       </table>
                     </div>
@@ -281,12 +288,16 @@ export default function WarrantyRegistryPage() {
       )}
 
       {/* Digital Certificate Modal */}
-      {selectedWarranty && (
+      {selectedWarranty && (() => {
+        const swProd = selectedWarranty.serialUnit?.product || selectedWarranty.product;
+        return (
         <Modal
           isOpen={Boolean(selectedWarranty)}
           onClose={() => setSelectedWarranty(null)}
           title="Official Solar Equipment Warranty Certificate"
-          subtitle={`SunPower Solutions Guarantee · Serial ${selectedWarranty.serialUnit?.serialNumber}`}
+          subtitle={selectedWarranty.serialUnit?.serialNumber
+            ? `SunPower Solutions Guarantee · Serial ${selectedWarranty.serialUnit.serialNumber}`
+            : `SunPower Solutions Guarantee · ${swProd?.name || 'System Warranty'}`}
           maxWidth="680px"
         >
           <div style={{border:'2px solid #fcd34d',borderRadius:10,background:'#fffdf5',padding:28,textAlign:'center'}}>
@@ -311,9 +322,9 @@ export default function WarrantyRegistryPage() {
                 ['Contact', selectedWarranty.customer?.phone || '—'],
                 ['Installation Site', [selectedWarranty.customer?.addressLine, selectedWarranty.customer?.city, selectedWarranty.customer?.state].filter(Boolean).join(', ') || '—'],
                 ['Project Code', selectedWarranty.project?.code || '—'],
-                ['Product Model', selectedWarranty.serialUnit?.product?.name],
-                ['Category', selectedWarranty.serialUnit?.product?.category || '—'],
-                ['Serial Number', selectedWarranty.serialUnit?.serialNumber],
+                ['Product Model', swProd?.name || '—'],
+                ['Category', swProd?.category || '—'],
+                ['Serial Number', selectedWarranty.serialUnit?.serialNumber || 'Non-serialized'],
                 ['Warranty Duration', selectedWarranty.warrantyMonths >= 12 ? `${selectedWarranty.warrantyMonths / 12} Year${selectedWarranty.warrantyMonths / 12 > 1 ? 's' : ''}` : `${selectedWarranty.warrantyMonths} Months`],
                 ['Warranty Start', `${new Date(selectedWarranty.startDate).toLocaleDateString('en-IN')} ${new Date(selectedWarranty.startDate).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}`],
                 ['Expiry Date', new Date(selectedWarranty.endDate).toLocaleDateString('en-IN')],
@@ -344,7 +355,8 @@ export default function WarrantyRegistryPage() {
             </div>
           </div>
         </Modal>
-      )}
+        );
+      })()}
     </div>
   );
 }

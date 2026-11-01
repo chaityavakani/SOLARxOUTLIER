@@ -139,6 +139,7 @@ export async function deliverDispatch(id, receivedByName) {
   const updated = await prisma.$transaction(async (tx) => {
     await tx.serialUnit.updateMany({ where: { dispatchId: id, status: 'DISPATCHED' }, data: { status: 'DELIVERED' } });
     const serials = await tx.serialUnit.findMany({ where: { dispatchId: id }, include: { product: true } });
+    // Warranties for serialized products (one per serial unit)
     for (const serial of serials) {
       const warrantyEnd = new Date(deliveredAt);
       warrantyEnd.setMonth(warrantyEnd.getMonth() + serial.product.warrantyMonths);
@@ -147,6 +148,23 @@ export async function deliverDispatch(id, receivedByName) {
         update: { startDate: deliveredAt, endDate: warrantyEnd },
         create: {
           serialUnitId: serial.id,
+          productId: serial.productId,
+          customerId: dispatch.project.customerId,
+          projectId: dispatch.projectId,
+          startDate: deliveredAt,
+          endDate: warrantyEnd,
+        },
+      });
+    }
+    // Warranties for non-serialized products (one per product per project)
+    for (const line of dispatch.lines.filter((l) => !l.product.isSerialized)) {
+      const warrantyEnd = new Date(deliveredAt);
+      warrantyEnd.setMonth(warrantyEnd.getMonth() + line.product.warrantyMonths);
+      await tx.warranty.upsert({
+        where: { productId_projectId: { productId: line.productId, projectId: dispatch.projectId } },
+        update: { startDate: deliveredAt, endDate: warrantyEnd },
+        create: {
+          productId: line.productId,
           customerId: dispatch.project.customerId,
           projectId: dispatch.projectId,
           startDate: deliveredAt,
