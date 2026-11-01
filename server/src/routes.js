@@ -17,6 +17,7 @@ import { ticketsRouter } from './modules/tickets/tickets.routes.js';
 import { inventoryRouter } from './modules/inventory/inventory.routes.js';
 import { customersRouter } from './modules/customers/customers.routes.js';
 import { reportsRouter } from './modules/reports/reports.routes.js';
+import { voiceRouter } from './modules/voice/voice.routes.js';
 
 export const apiRouter = Router();
 
@@ -38,3 +39,4 @@ apiRouter.use('/kit-templates', kitTemplatesRouter);
 apiRouter.use('/notifications', notificationsRouter);
 apiRouter.use('/audit', auditRouter);
 apiRouter.use('/reports', reportsRouter);
+apiRouter.use('/voice', voiceRouter);

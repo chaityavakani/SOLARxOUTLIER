@@ -937,5 +937,173 @@ input[type=checkbox], input[type=radio] { accent-color: #d97706; width: 16px; he
 }
 
 
+/* ─── Voice Survey Fill ───────────────────────────────────────────────── */
+
+.voice-banner {
+  border: 1.5px solid #bfdbfe;
+  border-radius: 12px;
+  padding: 14px 16px;
+  margin-bottom: 16px;
+  transition: border-color 0.3s, background 0.3s;
+}
+.voice-banner--warn {
+  background: #fefce8;
+  border-color: #fde68a;
+  color: #92400e;
+  font-size: 13px;
+  padding: 10px 14px;
+}
+.voice-banner-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.voice-banner-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  min-width: 180px;
+}
+.voice-main-btn {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: none;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: transform 0.15s, box-shadow 0.3s;
+}
+.voice-main-btn:hover:not(:disabled) { transform: scale(1.08); }
+.voice-main-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.voice-banner-title {
+  font-size: 14px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.voice-banner-sub {
+  font-size: 11px;
+  color: #6b7280;
+  margin-top: 2px;
+}
+.voice-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #dc2626;
+  animation: blink 0.8s infinite;
+}
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.2} }
+
+/* Language pills */
+.voice-lang-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.voice-lang-pill {
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+  border: 1.5px solid #e5e7eb;
+  background: white;
+  color: #374151;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.voice-lang-pill:hover:not(:disabled) { border-color: #2563eb; color: #2563eb; }
+.voice-lang-pill.active { background: #2563eb; color: white; border-color: #2563eb; }
+.voice-lang-pill:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* Live transcript */
+.voice-live-text {
+  margin-top: 10px;
+  padding: 8px 10px;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  font-size: 12px;
+  color: #374151;
+  line-height: 1.5;
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+}
+.voice-dot-inline {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #dc2626;
+  flex-shrink: 0;
+  margin-top: 4px;
+  animation: blink 0.8s infinite;
+}
+.voice-error-msg {
+  margin-top: 8px;
+  font-size: 12px;
+  color: #dc2626;
+  font-weight: 600;
+}
+.voice-hint {
+  margin-top: 10px;
+  font-size: 11px;
+  color: #6b7280;
+  background: white;
+  border: 1px dashed #d1d5db;
+  border-radius: 6px;
+  padding: 6px 10px;
+}
+.voice-filled-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 10px;
+}
+.voice-chip {
+  padding: 2px 10px;
+  background: #d1fae5;
+  color: #065f46;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 700;
+  border: 1px solid #6ee7b7;
+}
+.voice-heard-text {
+  margin-top: 8px;
+  font-size: 11px;
+  color: #374151;
+  font-style: italic;
+}
+
+.spin {
+  animation: spin 1s linear infinite;
+}
+
+/* Flash all inputs green briefly when voice fills the form */
+.voice-filled input,
+.voice-filled select,
+.voice-filled textarea {
+  animation: voice-fill-flash 1.8s ease forwards;
+}
+@keyframes voice-fill-flash {
+  0%   { background-color: #d1fae5; border-color: #059669; }
+  60%  { background-color: #d1fae5; border-color: #059669; }
+  100% { background-color: transparent; border-color: inherit; }
+}
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
 /* Tailwind utilities last so they take precedence over component defaults. */
 @tailwind utilities;

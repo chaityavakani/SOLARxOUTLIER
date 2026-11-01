@@ -16,7 +16,10 @@ customersRouter.get('/me/requests', asyncHandler(async (req, res) => {
     where: { customerId: req.user.customer.id },
     include: {
       surveys: { orderBy: { createdAt: 'desc' }, take: 1, select: { status: true, scheduledAt: true, reviewedAt: true, rejectionReason: true, recommendedCapacityKw: true } },
-      quotes: { orderBy: { createdAt: 'desc' }, take: 1, select: { id: true, number: true, status: true, total: true, validUntil: true } },
+      quotes: {
+        orderBy: { createdAt: 'desc' }, take: 1,
+        select: { id: true, number: true, status: true, total: true, validUntil: true, project: { select: { id: true, code: true, status: true } } },
+      },
     },
     orderBy: { createdAt: 'desc' },
   });

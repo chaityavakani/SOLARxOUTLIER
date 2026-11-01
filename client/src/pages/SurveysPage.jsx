@@ -19,6 +19,7 @@ import { api, errorText } from '../shared/api.js';
 import { money } from '../shared/formatters.js';
 import StatusBadge from '../components/StatusBadge.jsx';
 import Modal from '../components/Modal.jsx';
+import { VoiceSurveyFill, parseSurveyTranscript } from '../components/VoiceInput.jsx';
 
 export default function SurveysPage({ user, onNavigate }) {
   const [surveys, setSurveys] = useState([]);
@@ -41,6 +42,7 @@ export default function SurveysPage({ user, onNavigate }) {
   const isTechnician = user?.role === 'SURVEY_TECHNICIAN';
   const canApprove = ['DIRECTOR', 'SALES_EXECUTIVE', 'SUPER_ADMIN'].includes(user?.role);
 
+
   // Survey Report Form
   const [reportForm, setReportForm] = useState({
     roofType: 'RCC',
@@ -54,6 +56,14 @@ export default function SurveysPage({ user, onNavigate }) {
     recommendedSystemType: 'ON_GRID',
     notes: '',
   });
+
+  const [voiceFilled, setVoiceFilled] = useState(false);
+
+  function handleVoiceFill(fields) {
+    setReportForm((prev) => ({ ...prev, ...fields }));
+    setVoiceFilled(true);
+    setTimeout(() => setVoiceFilled(false), 2500);
+  }
 
   useEffect(() => {
     loadSurveys();
@@ -485,8 +495,11 @@ export default function SurveysPage({ user, onNavigate }) {
         title="Rooftop Feasibility Survey Report"
         subtitle={`Measurements for ${selectedSurvey?.lead?.name} (${selectedSurvey?.lead?.code})`}
       >
-        <form onSubmit={handleReportSubmit} className="survey-form">
+        <form onSubmit={handleReportSubmit} className={`survey-form${voiceFilled ? ' voice-filled' : ''}`}>
           {message && <p className="form-message error">{message}</p>}
+
+          {/* ── AI Voice Fill ── */}
+          <VoiceSurveyFill onFill={handleVoiceFill} />
 
           <div className="form-row">
             <label>
@@ -597,10 +610,10 @@ export default function SurveysPage({ user, onNavigate }) {
           <label>
             Survey Observations & Findings
             <textarea
-              rows="2"
+              rows="3"
               value={reportForm.notes}
               onChange={(e) => setReportForm({ ...reportForm, notes: e.target.value })}
-              placeholder="e.g. Excellent South exposure, zero tree shading, 15m cable run to meter board."
+              placeholder="Auto-filled by voice, or type your observations here."
             />
           </label>
 

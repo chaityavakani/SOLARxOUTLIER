@@ -34,6 +34,12 @@ export default function ProjectsPage({ onNavigate }) {
     reference: '',
   });
 
+  // Payment verify/reject
+  const [verifyingPaymentId, setVerifyingPaymentId] = useState(null);
+  const [rejectModalOpen, setRejectModalOpen] = useState(false);
+  const [rejectPaymentId, setRejectPaymentId] = useState(null);
+  const [rejectReason, setRejectReason] = useState('');
+
   // Subsidy Paperwork Modal
   const [subsidyModalOpen, setSubsidyModalOpen] = useState(false);
   const [subsidyForm, setSubsidyForm] = useState({
@@ -130,6 +136,29 @@ export default function ProjectsPage({ onNavigate }) {
     } finally {
       setBusy(false);
     }
+  }
+
+  async function handleVerifyPayment(paymentId) {
+    setVerifyingPaymentId(paymentId);
+    try {
+      await api.post(`/payments/${paymentId}/verify`);
+      openProject(selectedProject.id);
+      loadProjects();
+    } catch (err) { alert(errorText(err)); }
+    finally { setVerifyingPaymentId(null); }
+  }
+
+  async function handleRejectPayment(e) {
+    e.preventDefault();
+    if (!rejectReason.trim()) return;
+    setBusy(true);
+    try {
+      await api.post(`/payments/${rejectPaymentId}/reject`, { reason: rejectReason });
+      setRejectModalOpen(false); setRejectReason('');
+      openProject(selectedProject.id);
+      loadProjects();
+    } catch (err) { setMessage(errorText(err)); }
+    finally { setBusy(false); }
   }
 
   async function handleConfirmProject() {
@@ -452,6 +481,11 @@ export default function ProjectsPage({ onNavigate }) {
                     <div className="payment-history-section mb-4">
                       <h4 className="text-sm font-bold uppercase tracking-wider text-slate-700 mb-2">
                         Payment Receipts ({selectedProject.payments?.length || 0})
+                        {selectedProject.payments?.some((p) => p.status === 'PENDING_VERIFICATION') && (
+                          <span className="ml-2 px-2 py-0.5 rounded bg-amber-100 text-amber-800 text-xs font-bold normal-case">
+                            ⏳ {selectedProject.payments.filter((p) => p.status === 'PENDING_VERIFICATION').length} Pending Verification
+                          </span>
+                        )}
                       </h4>
                       {selectedProject.payments?.length === 0 ? (
                         <p className="text-xs muted p-2">No payments recorded yet.</p>
@@ -460,20 +494,48 @@ export default function ProjectsPage({ onNavigate }) {
                           <thead>
                             <tr>
                               <th>Date</th>
-                              <th>Payment Type</th>
-                              <th>Payment Mode</th>
+                              <th>Type</th>
+                              <th>Mode</th>
                               <th>Reference</th>
-                              <th>Amount Received</th>
+                              <th>Amount</th>
+                              <th>Status</th>
+                              <th>Action</th>
                             </tr>
                           </thead>
                           <tbody>
                             {selectedProject.payments?.map((pay) => (
-                              <tr key={pay.id}>
-                                <td>{new Date(pay.receivedAt).toLocaleDateString('en-IN')}</td>
+                              <tr key={pay.id} className={pay.status === 'PENDING_VERIFICATION' ? 'bg-amber-50' : ''}>
+                                <td>{new Date(pay.receivedAt || pay.createdAt).toLocaleDateString('en-IN')}</td>
                                 <td><strong>{pay.type}</strong></td>
                                 <td>{pay.mode}</td>
-                                <td>{pay.reference || '—'}</td>
-                                <td><strong className="text-emerald-700">{money(pay.amount)}</strong></td>
+                                <td>{pay.reference || '—'}{pay.proofNote && <span className="text-slate-400 ml-1" title={pay.proofNote}>📝</span>}</td>
+                                <td><strong className={pay.status === 'VERIFIED' ? 'text-emerald-700' : pay.status === 'REJECTED' ? 'text-red-500 line-through' : 'text-amber-700'}>{money(pay.amount)}</strong></td>
+                                <td>
+                                  {pay.status === 'VERIFIED' && <span className="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-semibold">✓ Received</span>}
+                                  {pay.status === 'PENDING_VERIFICATION' && <span className="px-2 py-0.5 rounded bg-amber-100 text-amber-800 font-semibold">⏳ Pending</span>}
+                                  {pay.status === 'REJECTED' && <span className="px-2 py-0.5 rounded bg-red-100 text-red-800 font-semibold" title={pay.rejectionReason}>✗ Rejected</span>}
+                                </td>
+                                <td>
+                                  {pay.status === 'PENDING_VERIFICATION' && (
+                                    <div className="flex gap-1">
+                                      <button
+                                        className="button primary small-button text-xs"
+                                        style={{ padding: '2px 8px', background: '#059669' }}
+                                        disabled={verifyingPaymentId === pay.id}
+                                        onClick={() => handleVerifyPayment(pay.id)}
+                                      >
+                                        {verifyingPaymentId === pay.id ? '…' : '✓ Received'}
+                                      </button>
+                                      <button
+                                        className="button outline small-button text-xs"
+                                        style={{ padding: '2px 8px', color: '#dc2626', borderColor: '#dc2626' }}
+                                        onClick={() => { setRejectPaymentId(pay.id); setRejectReason(''); setRejectModalOpen(true); }}
+                                      >
+                                        ✗ Reject
+                                      </button>
+                                    </div>
+                                  )}
+                                </td>
                               </tr>
                             ))}
                           </tbody>
@@ -566,6 +628,33 @@ export default function ProjectsPage({ onNavigate }) {
             </button>
             <button type="submit" className="button primary small-button" disabled={busy}>
               {busy ? 'Recording…' : 'Record Payment Receipt'}
+            </button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Reject Payment Modal */}
+      <Modal
+        isOpen={rejectModalOpen}
+        onClose={() => setRejectModalOpen(false)}
+        title="Reject Payment Submission"
+        subtitle="Provide a reason — the customer will see this message."
+      >
+        <form onSubmit={handleRejectPayment} className="survey-form">
+          {message && <p className="form-message error mb-3">{message}</p>}
+          <label>
+            Rejection Reason *
+            <textarea
+              required rows="3"
+              placeholder="e.g. UTR number not found in bank statement. Please resubmit with correct reference."
+              value={rejectReason}
+              onChange={(e) => setRejectReason(e.target.value)}
+            />
+          </label>
+          <div className="modal-actions mt-4 flex justify-end gap-2">
+            <button type="button" className="button outline small-button" onClick={() => setRejectModalOpen(false)}>Cancel</button>
+            <button type="submit" className="button primary small-button" style={{ background: '#dc2626' }} disabled={busy}>
+              {busy ? 'Rejecting…' : '✗ Reject Payment'}
             </button>
           </div>
         </form>

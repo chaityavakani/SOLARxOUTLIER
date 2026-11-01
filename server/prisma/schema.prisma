@@ -286,6 +286,7 @@ model User {
   quotesCreated         Quote[]           @relation("QuoteCreator")
   quotesAccepted        Quote[]           @relation("QuoteAcceptor")
   paymentsRecorded      Payment[]
+  paymentsVerified      Payment[]         @relation("PaymentVerifier")
   purchasesCreated      Purchase[]
   dispatchesPacked      Dispatch[]        @relation("DispatchPacker")
   installationsScheduled InstallationJob[] @relation("InstallationScheduler")
@@ -581,23 +582,36 @@ model Project {
   @@index([status])
 }
 
+enum PaymentStatus {
+  PENDING_VERIFICATION
+  VERIFIED
+  REJECTED
+}
+
 model Payment {
-  id            String      @id @default(cuid())
-  projectId     String?
-  invoiceId     String?
-  customerId    String
-  amount        Decimal     @db.Decimal(12, 2)
-  type          PaymentType
-  mode          PaymentMode
-  reference     String?
-  receivedAt    DateTime    @default(now())
-  recordedById  String?
-  createdAt     DateTime    @default(now())
+  id                  String        @id @default(cuid())
+  projectId           String?
+  invoiceId           String?
+  customerId          String
+  amount              Decimal       @db.Decimal(12, 2)
+  type                PaymentType
+  mode                PaymentMode
+  reference           String?
+  proofNote           String?
+  status              PaymentStatus @default(PENDING_VERIFICATION)
+  submittedByCustomer Boolean       @default(false)
+  receivedAt          DateTime      @default(now())
+  recordedById        String?
+  verifiedById        String?
+  verifiedAt          DateTime?
+  rejectionReason     String?
+  createdAt           DateTime      @default(now())
 
   project    Project? @relation(fields: [projectId], references: [id])
   invoice    Invoice? @relation(fields: [invoiceId], references: [id])
   customer   Customer @relation(fields: [customerId], references: [id])
   recordedBy User?    @relation(fields: [recordedById], references: [id])
+  verifiedBy User?    @relation("PaymentVerifier", fields: [verifiedById], references: [id])
 
   @@index([projectId])
   @@index([invoiceId])
